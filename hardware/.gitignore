@@ -1,0 +1,9 @@
+tetris.cache
+tetris.hw
+tetris.ip_user_files
+tetris.runs
+tetris.sim
+tetris.gen
+
+*.xpr
+*.Xil
