@@ -12,6 +12,12 @@ use crossterm::{
 };
 use futures::StreamExt;
 
+// TODO:
+// Wall kicks
+// Lose conditions
+// Score
+// Fix game loop
+
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
 
@@ -65,16 +71,17 @@ async fn game_loop(stdout: &mut Stdout) {
             _ = tokio::time::sleep(Duration::from_millis(200)) => {
                 if !piece.try_move(&field, Vec2(0, -1)) {
                     piece.settle(&mut field);
+
+                    if let Some(burn) = Burn::new(&field) {
+                        burn.animate(&mut field, stdout).await;
+                    }
+
                     piece = Piece::spawn();
                 }
             }
         }
 
-        stdout
-            .execute(terminal::Clear(terminal::ClearType::All))
-            .unwrap();
-
-        render(&field, &piece, stdout);
+        render(&field, Some(&piece), stdout);
     }
 }
 
@@ -230,6 +237,64 @@ impl Piece {
     }
 }
 
+struct Burn {
+    rows: Vec<usize>,
+}
+
+impl Burn {
+    fn new(field: &Field) -> Option<Self> {
+        let mut rows = vec![];
+        for row in 3..FIELD_HEIGHT + 3 {
+            let to_burn = (3..FIELD_WIDTH + 3)
+                .map(|x| field.color_at(x, row))
+                .all(|color| match color {
+                    None => false,
+                    Some(Color::None) => false,
+                    _ => true,
+                });
+
+            if to_burn {
+                rows.push(row);
+            }
+        }
+
+        if rows.is_empty() {
+            None
+        } else {
+            Some(Self { rows })
+        }
+    }
+
+    async fn animate(self, field: &mut Field, stdout: &mut Stdout) {
+        for step in 0..FIELD_WIDTH {
+            for row in &self.rows {
+                field.set_color_at(step + 3, *row, Color::None);
+            }
+
+            tokio::time::sleep(Duration::from_millis(20)).await;
+            // Invariant: Piece is not visible during the burn.
+            render(field, None, stdout);
+        }
+
+        let mut already_processed = 0;
+        for mut row in self.rows {
+            row -= already_processed;
+
+            for y in row + 1..FIELD_HEIGHT + 3 {
+                for x in 3..FIELD_WIDTH + 3 {
+                    field.set_color_at(x, y - 1, field.color_at(x, y).unwrap());
+                }
+            }
+
+            already_processed += 1;
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Invariant: Piece is not visible during the burn.
+            render(field, None, stdout);
+        }
+    }
+}
+
 struct Field {
     rows: [[Color; FIELD_WIDTH]; FIELD_HEIGHT],
 }
@@ -295,7 +360,11 @@ impl Field {
     }
 }
 
-fn render(field: &Field, piece: &Piece, stdout: &mut Stdout) {
+fn render(field: &Field, piece: Option<&Piece>, stdout: &mut Stdout) {
+    stdout
+        .execute(terminal::Clear(terminal::ClearType::All))
+        .unwrap();
+
     for y in 0..FIELD_HEIGHT + 3 {
         for x in 0..FIELD_WIDTH + 3 {
             let color = field.color_at(x, y);
@@ -317,6 +386,14 @@ fn render(field: &Field, piece: &Piece, stdout: &mut Stdout) {
         }
     }
 
+    if let Some(piece) = piece {
+        render_piece(piece, stdout);
+    }
+
+    stdout.flush().unwrap();
+}
+
+fn render_piece(piece: &Piece, stdout: &mut Stdout) {
     for position in piece.get_positions() {
         if Field::is_out_of_bounds(position.0 as usize, position.1 as usize) {
             continue;
@@ -333,6 +410,4 @@ fn render(field: &Field, piece: &Piece, stdout: &mut Stdout) {
             .queue(style::PrintStyledContent(symbol))
             .unwrap();
     }
-
-    stdout.flush().unwrap();
 }
