@@ -15,11 +15,14 @@ use futures::StreamExt;
 // TODO:
 // Wall kicks
 // Lose conditions
-// Score
 // Fix game loop
+// Soft/Hard drop (+score)
+// Levels (increase speed and score rewards)
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
+
+type Score = u64;
 
 #[tokio::main]
 async fn main() {
@@ -41,6 +44,7 @@ async fn game_loop(stdout: &mut Stdout) {
 
     let mut field = Field::new();
     let mut piece = Piece::spawn();
+    let mut score: Score = 0;
 
     let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
     let move_left = Event::Key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
@@ -73,7 +77,7 @@ async fn game_loop(stdout: &mut Stdout) {
                     piece.settle(&mut field);
 
                     if let Some(burn) = Burn::new(&field) {
-                        burn.animate(&mut field, stdout).await;
+                        burn.animate(&mut field, &mut score, stdout).await;
                     }
 
                     piece = Piece::spawn();
@@ -81,7 +85,7 @@ async fn game_loop(stdout: &mut Stdout) {
             }
         }
 
-        render(&field, Some(&piece), stdout);
+        render(&field, score, Some(&piece), stdout);
     }
 }
 
@@ -265,7 +269,7 @@ impl Burn {
         }
     }
 
-    async fn animate(self, field: &mut Field, stdout: &mut Stdout) {
+    async fn animate(self, field: &mut Field, score: &mut Score, stdout: &mut Stdout) {
         for step in 0..FIELD_WIDTH {
             for row in &self.rows {
                 field.set_color_at(step + 3, *row, Color::None);
@@ -273,8 +277,16 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(20)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, None, stdout);
+            render(field, *score, None, stdout);
         }
+
+        *score += match self.rows.len() {
+            1 => 100,
+            2 => 300,
+            3 => 500,
+            4 => 800,
+            _ => unreachable!(),
+        };
 
         let mut already_processed = 0;
         for mut row in self.rows {
@@ -290,7 +302,7 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(100)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, None, stdout);
+            render(field, *score, None, stdout);
         }
     }
 }
@@ -360,13 +372,13 @@ impl Field {
     }
 }
 
-fn render(field: &Field, piece: Option<&Piece>, stdout: &mut Stdout) {
+fn render(field: &Field, score: Score, piece: Option<&Piece>, stdout: &mut Stdout) {
     stdout
         .execute(terminal::Clear(terminal::ClearType::All))
         .unwrap();
 
-    for y in 0..FIELD_HEIGHT + 3 {
-        for x in 0..FIELD_WIDTH + 3 {
+    for y in 3..FIELD_HEIGHT + 3 {
+        for x in 3..FIELD_WIDTH + 3 {
             let color = field.color_at(x, y);
 
             let Some(color) = color else {
@@ -385,6 +397,14 @@ fn render(field: &Field, piece: Option<&Piece>, stdout: &mut Stdout) {
                 .unwrap();
         }
     }
+
+    stdout
+        .queue(cursor::MoveTo(6, FIELD_HEIGHT as u16))
+        .unwrap()
+        .queue(style::PrintStyledContent(
+            format!("score: {}", score).dark_magenta(),
+        ))
+        .unwrap();
 
     if let Some(piece) = piece {
         render_piece(piece, stdout);
