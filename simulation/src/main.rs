@@ -14,7 +14,6 @@ use futures::StreamExt;
 
 // TODO:
 // Wall kicks
-// Lose conditions
 // Fix game loop
 // Soft/Hard drop (+score)
 // Levels (increase speed and score rewards)
@@ -79,6 +78,8 @@ async fn game_loop(stdout: &mut Stdout) {
                     if let Some(burn) = Burn::new(&field) {
                         burn.animate(&mut field, &mut score, stdout).await;
                     }
+
+                    try_lose(&mut field, &mut score, stdout).await;
 
                     piece = Piece::spawn();
                 }
@@ -307,6 +308,27 @@ impl Burn {
     }
 }
 
+async fn try_lose(field: &mut Field, score: &mut Score, stdout: &mut Stdout) {
+    let y = FIELD_HEIGHT + 3 - 1;
+    let lost = (3..FIELD_WIDTH + 3)
+        .map(|x| field.color_at(x, y))
+        .any(|color| color != Some(Color::None));
+
+    if lost {
+        for y in (3..FIELD_HEIGHT + 3).rev() {
+            for x in 3..FIELD_WIDTH + 3 {
+                field.set_color_at(x, y, Color::None);
+            }
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Invariant: Piece is not visible during the lose.
+            render(field, *score, None, stdout);
+        }
+
+        *score = 0;
+    }
+}
+
 struct Field {
     rows: [[Color; FIELD_WIDTH]; FIELD_HEIGHT],
 }
@@ -349,6 +371,7 @@ impl Field {
         x < 3 || x > FIELD_WIDTH + 3 - 1 || y < 3 || y > FIELD_HEIGHT + 3 - 1
     }
 
+    // TODO: Don't do bound checks in most cases.
     fn color_at(&self, mut x: usize, mut y: usize) -> Option<Color> {
         if Self::is_out_of_bounds(x, y) {
             return None;
