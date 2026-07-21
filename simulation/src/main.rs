@@ -11,10 +11,10 @@ use crossterm::{
     terminal,
 };
 use futures::StreamExt;
+use tokio::{sync::mpsc, time::Instant};
 
 // TODO:
 // Wall kicks
-// Fix game loop
 // Soft/Hard drop (+score)
 // Levels (increase speed and score rewards)
 
@@ -39,8 +39,6 @@ async fn main() {
 }
 
 async fn game_loop(stdout: &mut Stdout) {
-    let mut events = EventStream::new();
-
     let mut field = Field::new();
     let mut piece = Piece::spawn();
     let mut score: Score = 0;
@@ -50,44 +48,67 @@ async fn game_loop(stdout: &mut Stdout) {
     let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
     let rotate = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
 
+    let mut events = listen_events();
+
+    let mut last_fall = Instant::now();
+    const FALL_PERIOD: Duration = Duration::from_millis(200);
+
     loop {
-        tokio::select! {
-            event = events.next() => {
-                let event = event.unwrap().unwrap();
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
-                if event == ctrl_c {
-                    return;
-                }
+        if !events.is_empty() {
+            let event = events.recv().await.unwrap();
 
-                if event == move_left {
-                    piece.try_move(&field, Vec2(-1, 0));
-                }
-
-                if event == move_right {
-                    piece.try_move(&field, Vec2(1, 0));
-                }
-
-                if event == rotate {
-                    piece.try_rotate(&field);
-                }
+            if event == ctrl_c {
+                return;
             }
-            _ = tokio::time::sleep(Duration::from_millis(200)) => {
-                if !piece.try_move(&field, Vec2(0, -1)) {
-                    piece.settle(&mut field);
 
-                    if let Some(burn) = Burn::new(&field) {
-                        burn.animate(&mut field, &mut score, stdout).await;
-                    }
+            if event == move_left {
+                piece.try_move(&field, Vec2(-1, 0));
+            }
 
-                    try_lose(&mut field, &mut score, stdout).await;
+            if event == move_right {
+                piece.try_move(&field, Vec2(1, 0));
+            }
 
-                    piece = Piece::spawn();
+            if event == rotate {
+                piece.try_rotate(&field);
+            }
+        }
+
+        if last_fall.elapsed() >= FALL_PERIOD {
+            last_fall = Instant::now();
+
+            if !piece.try_move(&field, Vec2(0, -1)) {
+                piece.settle(&mut field);
+
+                if let Some(burn) = Burn::new(&field) {
+                    burn.animate(&mut field, &mut score, stdout).await;
                 }
+
+                try_lose(&mut field, &mut score, stdout).await;
+
+                piece = Piece::spawn();
             }
         }
 
         render(&field, score, Some(&piece), stdout);
     }
+}
+
+fn listen_events() -> mpsc::Receiver<Event> {
+    let (sender, receiver) = mpsc::channel(1024);
+
+    let mut events = EventStream::new();
+
+    tokio::spawn(async move {
+        loop {
+            let event = events.next().await.unwrap().unwrap();
+            sender.send(event).await.unwrap();
+        }
+    });
+
+    receiver
 }
 
 #[derive(Clone, Copy, Debug)]
