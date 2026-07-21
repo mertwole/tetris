@@ -14,7 +14,6 @@ use futures::StreamExt;
 use tokio::{sync::mpsc, time::Instant};
 
 // TODO:
-// Wall kicks
 // Soft/Hard drop (+score)
 // Levels (increase speed and score rewards)
 
@@ -33,9 +32,9 @@ async fn main() {
 
     game_loop(&mut stdout).await;
 
+    terminal::disable_raw_mode().unwrap();
     stdout.execute(cursor::Show).unwrap();
     stdout.execute(terminal::LeaveAlternateScreen).unwrap();
-    terminal::disable_raw_mode().unwrap();
 }
 
 async fn game_loop(stdout: &mut Stdout) {
@@ -72,7 +71,7 @@ async fn game_loop(stdout: &mut Stdout) {
             }
 
             if event == rotate {
-                piece.try_rotate(&field);
+                piece.try_rotate(&field, RotationDirection::Cw);
             }
         }
 
@@ -131,6 +130,12 @@ enum PieceType {
     S,
     T,
     Z,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum RotationDirection {
+    Cw,
+    Ccw,
 }
 
 impl Piece {
@@ -231,29 +236,73 @@ impl Piece {
         true
     }
 
-    fn try_rotate(&mut self, field: &Field) -> bool {
+    fn try_rotate(&mut self, field: &Field, direction: RotationDirection) -> bool {
         let prev_rotation = self.rotation;
 
-        self.rotation = (self.rotation + 1) % 4;
+        self.rotation = match direction {
+            RotationDirection::Cw => self.rotation + 1,
+            RotationDirection::Ccw => self.rotation + 3,
+        } % 4;
 
-        for position in self.get_positions() {
-            match field.color_at(position.0 as usize, position.1 as usize) {
-                Some(Color::None) => {}
-                None => {
-                    if position.1 < 3 || position.0 < 3 || position.0 > FIELD_WIDTH as isize + 3 - 1
-                    {
-                        self.rotation = prev_rotation;
-                        return false;
-                    }
-                }
-                _ => {
-                    self.rotation = prev_rotation;
-                    return false;
-                }
+        let wall_kick_offsets_common = match (prev_rotation, direction) {
+            (0, RotationDirection::Cw) | (2, RotationDirection::Ccw) => {
+                [Vec2(-1, 0), Vec2(-1, 1), Vec2(0, -2), Vec2(-1, -2)]
             }
+            (1, RotationDirection::Ccw) | (1, RotationDirection::Cw) => {
+                [Vec2(1, 0), Vec2(1, -1), Vec2(0, 2), Vec2(1, 2)]
+            }
+            (2, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
+                [Vec2(1, 0), Vec2(1, 1), Vec2(0, -2), Vec2(1, -2)]
+            }
+            (3, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
+                [Vec2(-1, 0), Vec2(-1, -1), Vec2(0, 2), Vec2(-1, 2)]
+            }
+            (_, _) => unreachable!(),
+        };
+
+        let wall_kick_offsets_i = match (prev_rotation, direction) {
+            (0, RotationDirection::Cw) | (3, RotationDirection::Ccw) => {
+                [Vec2(-2, 0), Vec2(1, 0), Vec2(-2, -1), Vec2(1, 2)]
+            }
+            (1, RotationDirection::Ccw) | (2, RotationDirection::Cw) => {
+                [Vec2(2, 0), Vec2(-1, 0), Vec2(2, 1), Vec2(-1, -2)]
+            }
+            (1, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
+                [Vec2(-1, 0), Vec2(2, 0), Vec2(-1, 2), Vec2(2, -1)]
+            }
+            (2, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
+                [Vec2(1, 0), Vec2(-2, 0), Vec2(1, -2), Vec2(-2, 1)]
+            }
+            (_, _) => unreachable!(),
+        };
+
+        let wall_kicks: Vec<_> = match self.ty {
+            PieceType::O => vec![Vec2(0, 0)],
+            PieceType::I => [&[Vec2(0, 0)], &wall_kick_offsets_i[..]].concat().to_vec(),
+            _ => [&[Vec2(0, 0)], &wall_kick_offsets_common[..]]
+                .concat()
+                .to_vec(),
+        };
+
+        for wall_kick in wall_kicks {
+            let prev_position = self.position;
+            self.position = Vec2(self.position.0 + wall_kick.0, self.position.1 + wall_kick.1);
+
+            let fits = self
+                .get_positions()
+                .into_iter()
+                .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
+
+            if fits {
+                return true;
+            }
+
+            self.position = prev_position;
         }
 
-        true
+        self.rotation = prev_rotation;
+
+        false
     }
 
     fn settle(&self, field: &mut Field) {
@@ -406,7 +455,7 @@ impl Field {
 
     fn set_color_at(&mut self, mut x: usize, mut y: usize, color: Color) {
         if Self::is_out_of_bounds(x, y) {
-            panic!("Out of bounds")
+            return;
         }
 
         x -= 3;
