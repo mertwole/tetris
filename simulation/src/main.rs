@@ -6,7 +6,10 @@ use std::{
 
 use crossterm::{
     ExecutableCommand, QueueableCommand, cursor,
-    event::{Event, EventStream, KeyCode, KeyEvent, KeyModifiers},
+    event::{
+        Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
+        KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
+    },
     style::{self, StyledContent, Stylize},
     terminal,
 };
@@ -14,11 +17,13 @@ use futures::StreamExt;
 use tokio::{sync::mpsc, time::Instant};
 
 // TODO:
-// Soft/Hard drop (+score)
 // Levels (increase speed and score rewards)
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
+
+const FALL_PERIOD_NORMAL: Duration = Duration::from_millis(200);
+const FALL_PERIOD_SOFT_DROP: Duration = Duration::from_millis(50);
 
 type Score = u64;
 
@@ -28,6 +33,11 @@ async fn main() {
 
     stdout.execute(terminal::EnterAlternateScreen).unwrap();
     stdout.execute(cursor::Hide).unwrap();
+    stdout
+        .execute(PushKeyboardEnhancementFlags(
+            KeyboardEnhancementFlags::REPORT_EVENT_TYPES,
+        ))
+        .unwrap();
     terminal::enable_raw_mode().unwrap();
 
     game_loop(&mut stdout).await;
@@ -47,10 +57,21 @@ async fn game_loop(stdout: &mut Stdout) {
     let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
     let rotate = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
 
+    let soft_drop_pressed = Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Down,
+        KeyModifiers::empty(),
+        KeyEventKind::Press,
+    ));
+    let soft_drop_released = Event::Key(KeyEvent::new_with_kind(
+        KeyCode::Down,
+        KeyModifiers::empty(),
+        KeyEventKind::Release,
+    ));
+
     let mut events = listen_events();
 
     let mut last_fall = Instant::now();
-    const FALL_PERIOD: Duration = Duration::from_millis(200);
+    let mut fall_period = FALL_PERIOD_NORMAL;
 
     loop {
         tokio::time::sleep(Duration::from_millis(10)).await;
@@ -73,13 +94,23 @@ async fn game_loop(stdout: &mut Stdout) {
             if event == rotate {
                 piece.try_rotate(&field, RotationDirection::Cw);
             }
+
+            if event == soft_drop_pressed {
+                fall_period = FALL_PERIOD_SOFT_DROP;
+            }
+
+            if event == soft_drop_released {
+                fall_period = FALL_PERIOD_NORMAL;
+            }
         }
 
-        if last_fall.elapsed() >= FALL_PERIOD {
+        if last_fall.elapsed() >= fall_period {
             last_fall = Instant::now();
 
             if !piece.try_move(&field, Vec2(0, -1)) {
                 piece.settle(&mut field);
+
+                fall_period = FALL_PERIOD_NORMAL;
 
                 if let Some(burn) = Burn::new(&field) {
                     burn.animate(&mut field, &mut score, stdout).await;
