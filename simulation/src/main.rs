@@ -25,6 +25,8 @@ const FIELD_HEIGHT: usize = 20;
 const FALL_PERIOD_NORMAL: Duration = Duration::from_millis(200);
 const FALL_PERIOD_SOFT_DROP: Duration = Duration::from_millis(50);
 
+const SOFT_DROP_SCORE_PER_CELL: u64 = 1;
+
 type Score = u64;
 
 #[tokio::main]
@@ -106,6 +108,10 @@ async fn game_loop(stdout: &mut Stdout) {
 
         if last_fall.elapsed() >= fall_period {
             last_fall = Instant::now();
+
+            if fall_period == FALL_PERIOD_SOFT_DROP {
+                score += SOFT_DROP_SCORE_PER_CELL;
+            }
 
             if !piece.try_move(&field, Vec2(0, -1)) {
                 piece.settle(&mut field);
