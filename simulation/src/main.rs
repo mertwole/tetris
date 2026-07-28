@@ -17,7 +17,6 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 
 // TODO:
-// Proper random generation
 // Delay between lock and spawn
 
 const FIELD_WIDTH: usize = 10;
