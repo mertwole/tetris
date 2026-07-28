@@ -20,6 +20,7 @@ use tokio::sync::mpsc;
 // Proper random generation
 // Delay between lock and spawn
 // Show next piece
+// SRS to NRS
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
@@ -312,60 +313,13 @@ impl Piece {
             RotationDirection::Ccw => self.rotation + 3,
         } % 4;
 
-        let wall_kick_offsets_common = match (prev_rotation, direction) {
-            (0, RotationDirection::Cw) | (2, RotationDirection::Ccw) => {
-                [Vec2(-1, 0), Vec2(-1, 1), Vec2(0, -2), Vec2(-1, -2)]
-            }
-            (1, RotationDirection::Ccw) | (1, RotationDirection::Cw) => {
-                [Vec2(1, 0), Vec2(1, -1), Vec2(0, 2), Vec2(1, 2)]
-            }
-            (2, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
-                [Vec2(1, 0), Vec2(1, 1), Vec2(0, -2), Vec2(1, -2)]
-            }
-            (3, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
-                [Vec2(-1, 0), Vec2(-1, -1), Vec2(0, 2), Vec2(-1, 2)]
-            }
-            (_, _) => unreachable!(),
-        };
+        let fits = self
+            .get_positions()
+            .into_iter()
+            .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
 
-        let wall_kick_offsets_i = match (prev_rotation, direction) {
-            (0, RotationDirection::Cw) | (3, RotationDirection::Ccw) => {
-                [Vec2(-2, 0), Vec2(1, 0), Vec2(-2, -1), Vec2(1, 2)]
-            }
-            (1, RotationDirection::Ccw) | (2, RotationDirection::Cw) => {
-                [Vec2(2, 0), Vec2(-1, 0), Vec2(2, 1), Vec2(-1, -2)]
-            }
-            (1, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
-                [Vec2(-1, 0), Vec2(2, 0), Vec2(-1, 2), Vec2(2, -1)]
-            }
-            (2, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
-                [Vec2(1, 0), Vec2(-2, 0), Vec2(1, -2), Vec2(-2, 1)]
-            }
-            (_, _) => unreachable!(),
-        };
-
-        let wall_kicks: Vec<_> = match self.ty {
-            PieceType::O => vec![Vec2(0, 0)],
-            PieceType::I => [&[Vec2(0, 0)], &wall_kick_offsets_i[..]].concat().to_vec(),
-            _ => [&[Vec2(0, 0)], &wall_kick_offsets_common[..]]
-                .concat()
-                .to_vec(),
-        };
-
-        for wall_kick in wall_kicks {
-            let prev_position = self.position;
-            self.position = Vec2(self.position.0 + wall_kick.0, self.position.1 + wall_kick.1);
-
-            let fits = self
-                .get_positions()
-                .into_iter()
-                .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
-
-            if fits {
-                return true;
-            }
-
-            self.position = prev_position;
+        if fits {
+            return true;
         }
 
         self.rotation = prev_rotation;
