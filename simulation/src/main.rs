@@ -123,21 +123,23 @@ async fn game_loop(stdout: &mut Stdout) {
 
                 if let Some(burn) = Burn::new(&field) {
                     lines_cleared += burn.get_row_count();
-                    fall_period_normal = gravity_by_level((lines_cleared / 10) as u8);
+                    let level = (lines_cleared / 10) as u8;
 
-                    burn.animate(&mut field, &mut score, lines_cleared / 10, stdout)
-                        .await;
+                    fall_period_normal = gravity_by_level(level);
+
+                    burn.animate(&mut field, &mut score, level, stdout).await;
                 }
 
                 fall_period = fall_period_normal;
 
-                try_lose(&mut field, &mut score, stdout).await;
+                try_lose(&mut field, &mut score, &mut lines_cleared, stdout).await;
 
                 piece = Piece::spawn();
             }
         }
 
-        render(&field, score, Some(&piece), stdout);
+        let level = (lines_cleared / 10) as u8;
+        render(&field, score, level, Some(&piece), stdout);
     }
 }
 
@@ -410,13 +412,7 @@ impl Burn {
         self.rows.len()
     }
 
-    async fn animate(
-        self,
-        field: &mut Field,
-        score: &mut Score,
-        level: usize,
-        stdout: &mut Stdout,
-    ) {
+    async fn animate(self, field: &mut Field, score: &mut Score, level: u8, stdout: &mut Stdout) {
         for step in 0..FIELD_WIDTH {
             for row in &self.rows {
                 field.set_color_at(step + 3, *row, Color::None);
@@ -424,7 +420,7 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(20)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, *score, None, stdout);
+            render(field, *score, level, None, stdout);
         }
 
         *score += match self.rows.len() {
@@ -449,12 +445,17 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(100)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, *score, None, stdout);
+            render(field, *score, level, None, stdout);
         }
     }
 }
 
-async fn try_lose(field: &mut Field, score: &mut Score, stdout: &mut Stdout) {
+async fn try_lose(
+    field: &mut Field,
+    score: &mut Score,
+    lines_cleared: &mut usize,
+    stdout: &mut Stdout,
+) {
     let y = FIELD_HEIGHT + 3 - 1;
     let lost = (3..FIELD_WIDTH + 3)
         .map(|x| field.color_at(x, y))
@@ -468,10 +469,11 @@ async fn try_lose(field: &mut Field, score: &mut Score, stdout: &mut Stdout) {
 
             tokio::time::sleep(Duration::from_millis(100)).await;
             // Invariant: Piece is not visible during the lose.
-            render(field, *score, None, stdout);
+            render(field, *score, (*lines_cleared / 10) as u8, None, stdout);
         }
 
         *score = 0;
+        *lines_cleared = 0;
     }
 }
 
@@ -541,7 +543,7 @@ impl Field {
     }
 }
 
-fn render(field: &Field, score: Score, piece: Option<&Piece>, stdout: &mut Stdout) {
+fn render(field: &Field, score: Score, level: u8, piece: Option<&Piece>, stdout: &mut Stdout) {
     stdout
         .execute(terminal::Clear(terminal::ClearType::All))
         .unwrap();
@@ -571,7 +573,7 @@ fn render(field: &Field, score: Score, piece: Option<&Piece>, stdout: &mut Stdou
         .queue(cursor::MoveTo(6, FIELD_HEIGHT as u16))
         .unwrap()
         .queue(style::PrintStyledContent(
-            format!("score: {}", score).dark_magenta(),
+            format!("score: {}  level: {}", score, level).dark_magenta(),
         ))
         .unwrap();
 
