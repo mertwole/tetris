@@ -241,35 +241,35 @@ impl Piece {
 
     fn get_positions(&self) -> [Vec2; 4] {
         let positions = match (self.ty, self.rotation) {
-            (PieceType::J, 0) => [Vec2(-1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::J, 1) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(1, 1)],
-            (PieceType::J, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-            (PieceType::J, 3) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(0, 1)],
+            (PieceType::J, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
+            (PieceType::J, 1) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(0, 1)],
+            (PieceType::J, 2) => [Vec2(-1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::J, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(1, 1)],
 
-            (PieceType::L, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, 1)],
-            (PieceType::L, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::L, 2) => [Vec2(-1, -1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::L, 3) => [Vec2(-1, 1), Vec2(0, 1), Vec2(0, 0), Vec2(0, -1)],
+            (PieceType::L, 0) => [Vec2(-1, -1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::L, 1) => [Vec2(-1, 1), Vec2(0, 1), Vec2(0, 0), Vec2(0, -1)],
+            (PieceType::L, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, 1)],
+            (PieceType::L, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
 
-            (PieceType::S, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(1, 1)],
+            (PieceType::S, 0) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
             (PieceType::S, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
             (PieceType::S, 2) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::S, 3) => [Vec2(-1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1)],
+            (PieceType::S, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
 
-            (PieceType::Z, 0) => [Vec2(-1, 1), Vec2(0, 1), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::Z, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
             (PieceType::Z, 1) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
             (PieceType::Z, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::Z, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(-1, 0), Vec2(-1, -1)],
+            (PieceType::Z, 3) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
 
-            (PieceType::T, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(1, 0)],
-            (PieceType::T, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
-            (PieceType::T, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, 0)],
-            (PieceType::T, 3) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(0, -1)],
+            (PieceType::T, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, 0)],
+            (PieceType::T, 1) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(0, -1)],
+            (PieceType::T, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(1, 0)],
+            (PieceType::T, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
 
-            (PieceType::I, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(2, 0)],
-            (PieceType::I, 1) => [Vec2(1, 1), Vec2(1, 0), Vec2(1, -1), Vec2(1, -2)],
-            (PieceType::I, 2) => [Vec2(-1, -1), Vec2(0, -1), Vec2(1, -1), Vec2(2, -1)],
-            (PieceType::I, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(0, -1), Vec2(0, -2)],
+            (PieceType::I, 0) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::I, 1) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
+            (PieceType::I, 2) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::I, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
 
             (PieceType::O, _) => [Vec2(0, 0), Vec2(0, 1), Vec2(1, 1), Vec2(1, 0)],
             _ => unreachable!(),
@@ -312,60 +312,13 @@ impl Piece {
             RotationDirection::Ccw => self.rotation + 3,
         } % 4;
 
-        let wall_kick_offsets_common = match (prev_rotation, direction) {
-            (0, RotationDirection::Cw) | (2, RotationDirection::Ccw) => {
-                [Vec2(-1, 0), Vec2(-1, 1), Vec2(0, -2), Vec2(-1, -2)]
-            }
-            (1, RotationDirection::Ccw) | (1, RotationDirection::Cw) => {
-                [Vec2(1, 0), Vec2(1, -1), Vec2(0, 2), Vec2(1, 2)]
-            }
-            (2, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
-                [Vec2(1, 0), Vec2(1, 1), Vec2(0, -2), Vec2(1, -2)]
-            }
-            (3, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
-                [Vec2(-1, 0), Vec2(-1, -1), Vec2(0, 2), Vec2(-1, 2)]
-            }
-            (_, _) => unreachable!(),
-        };
+        let fits = self
+            .get_positions()
+            .into_iter()
+            .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
 
-        let wall_kick_offsets_i = match (prev_rotation, direction) {
-            (0, RotationDirection::Cw) | (3, RotationDirection::Ccw) => {
-                [Vec2(-2, 0), Vec2(1, 0), Vec2(-2, -1), Vec2(1, 2)]
-            }
-            (1, RotationDirection::Ccw) | (2, RotationDirection::Cw) => {
-                [Vec2(2, 0), Vec2(-1, 0), Vec2(2, 1), Vec2(-1, -2)]
-            }
-            (1, RotationDirection::Cw) | (0, RotationDirection::Ccw) => {
-                [Vec2(-1, 0), Vec2(2, 0), Vec2(-1, 2), Vec2(2, -1)]
-            }
-            (2, RotationDirection::Ccw) | (3, RotationDirection::Cw) => {
-                [Vec2(1, 0), Vec2(-2, 0), Vec2(1, -2), Vec2(-2, 1)]
-            }
-            (_, _) => unreachable!(),
-        };
-
-        let wall_kicks: Vec<_> = match self.ty {
-            PieceType::O => vec![Vec2(0, 0)],
-            PieceType::I => [&[Vec2(0, 0)], &wall_kick_offsets_i[..]].concat().to_vec(),
-            _ => [&[Vec2(0, 0)], &wall_kick_offsets_common[..]]
-                .concat()
-                .to_vec(),
-        };
-
-        for wall_kick in wall_kicks {
-            let prev_position = self.position;
-            self.position = Vec2(self.position.0 + wall_kick.0, self.position.1 + wall_kick.1);
-
-            let fits = self
-                .get_positions()
-                .into_iter()
-                .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
-
-            if fits {
-                return true;
-            }
-
-            self.position = prev_position;
+        if fits {
+            return true;
         }
 
         self.rotation = prev_rotation;
