@@ -17,9 +17,7 @@ use futures::StreamExt;
 use tokio::sync::mpsc;
 
 // TODO:
-// Proper random generation
 // Delay between lock and spawn
-// Show next piece
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
@@ -52,7 +50,10 @@ async fn main() {
 
 async fn game_loop(stdout: &mut Stdout) {
     let mut field = Field::new();
-    let mut piece = Piece::spawn();
+
+    let mut piece = Piece::spawn(None);
+    let mut next_piece = Piece::spawn(Some(piece.ty));
+
     let mut score: Score = 0;
 
     let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
@@ -127,19 +128,28 @@ async fn game_loop(stdout: &mut Stdout) {
 
                     fall_period_normal = gravity_by_level(level);
 
-                    burn.animate(&mut field, &mut score, level, stdout).await;
+                    burn.animate(&mut field, &next_piece, &mut score, level, stdout)
+                        .await;
                 }
 
                 fall_period = fall_period_normal;
 
-                try_lose(&mut field, &mut score, &mut lines_cleared, stdout).await;
+                try_lose(
+                    &mut field,
+                    &next_piece,
+                    &mut score,
+                    &mut lines_cleared,
+                    stdout,
+                )
+                .await;
 
-                piece = Piece::spawn();
+                piece = next_piece;
+                next_piece = Piece::spawn(Some(piece.ty));
             }
         }
 
         let level = (lines_cleared / 10) as u8;
-        render(&field, score, level, Some(&piece), stdout);
+        render(&field, score, level, Some(&piece), &next_piece, stdout);
     }
 }
 
@@ -190,8 +200,9 @@ struct Piece {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[repr(usize)]
 enum PieceType {
-    I,
+    I = 0,
     J,
     O,
     L,
@@ -207,9 +218,14 @@ enum RotationDirection {
 }
 
 impl Piece {
-    fn spawn() -> Self {
-        let ty = rand::random_range(0..7usize);
-        let ty = match ty {
+    fn spawn(last_piece: Option<PieceType>) -> Self {
+        let mut roll = rand::random_range(0..8usize);
+        let last_piece = last_piece.map(|piece| piece as usize).unwrap_or(7);
+        if roll == 7 || roll == last_piece {
+            roll = rand::random_range(0..7usize);
+        }
+
+        let ty = match roll {
             0 => PieceType::I,
             1 => PieceType::J,
             2 => PieceType::O,
@@ -365,7 +381,14 @@ impl Burn {
         self.rows.len()
     }
 
-    async fn animate(self, field: &mut Field, score: &mut Score, level: u8, stdout: &mut Stdout) {
+    async fn animate(
+        self,
+        field: &mut Field,
+        next_piece: &Piece,
+        score: &mut Score,
+        level: u8,
+        stdout: &mut Stdout,
+    ) {
         for step in 0..FIELD_WIDTH {
             for row in &self.rows {
                 field.set_color_at(step + 3, *row, Color::None);
@@ -373,7 +396,7 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(20)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, *score, level, None, stdout);
+            render(field, *score, level, None, next_piece, stdout);
         }
 
         *score += match self.rows.len() {
@@ -398,13 +421,14 @@ impl Burn {
 
             tokio::time::sleep(Duration::from_millis(100)).await;
             // Invariant: Piece is not visible during the burn.
-            render(field, *score, level, None, stdout);
+            render(field, *score, level, None, next_piece, stdout);
         }
     }
 }
 
 async fn try_lose(
     field: &mut Field,
+    next_piece: &Piece,
     score: &mut Score,
     lines_cleared: &mut usize,
     stdout: &mut Stdout,
@@ -422,7 +446,14 @@ async fn try_lose(
 
             tokio::time::sleep(Duration::from_millis(100)).await;
             // Invariant: Piece is not visible during the lose.
-            render(field, *score, (*lines_cleared / 10) as u8, None, stdout);
+            render(
+                field,
+                *score,
+                (*lines_cleared / 10) as u8,
+                None,
+                next_piece,
+                stdout,
+            );
         }
 
         *score = 0;
@@ -496,7 +527,14 @@ impl Field {
     }
 }
 
-fn render(field: &Field, score: Score, level: u8, piece: Option<&Piece>, stdout: &mut Stdout) {
+fn render(
+    field: &Field,
+    score: Score,
+    level: u8,
+    piece: Option<&Piece>,
+    next_piece: &Piece,
+    stdout: &mut Stdout,
+) {
     stdout
         .execute(terminal::Clear(terminal::ClearType::All))
         .unwrap();
@@ -530,16 +568,21 @@ fn render(field: &Field, score: Score, level: u8, piece: Option<&Piece>, stdout:
         ))
         .unwrap();
 
+    let mut next_piece = next_piece.clone();
+    next_piece.position.1 -= 2;
+    next_piece.position.0 += FIELD_WIDTH as isize;
+    render_piece(&next_piece, false, stdout);
+
     if let Some(piece) = piece {
-        render_piece(piece, stdout);
+        render_piece(piece, true, stdout);
     }
 
     stdout.flush().unwrap();
 }
 
-fn render_piece(piece: &Piece, stdout: &mut Stdout) {
+fn render_piece(piece: &Piece, bound_check: bool, stdout: &mut Stdout) {
     for position in piece.get_positions() {
-        if Field::is_out_of_bounds(position.0 as usize, position.1 as usize) {
+        if bound_check && Field::is_out_of_bounds(position.0 as usize, position.1 as usize) {
             continue;
         }
 
