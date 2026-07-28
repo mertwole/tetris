@@ -19,7 +19,7 @@ use tokio::sync::mpsc;
 // TODO:
 // Proper random generation
 // Delay between lock and spawn
-// Level up animation
+// Show next piece
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
