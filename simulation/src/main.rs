@@ -89,6 +89,8 @@ async fn game_loop(stdout: &mut Stdout) {
 
     let mut lines_cleared = 0;
 
+    let mut are_timer = 0;
+
     loop {
         tokio::time::sleep(Duration::from_millis(1000 / 60)).await;
 
@@ -124,6 +126,11 @@ async fn game_loop(stdout: &mut Stdout) {
             }
         }
 
+        if are_timer > 0 {
+            are_timer -= 1;
+            continue;
+        }
+
         frames_from_last_fall += 1;
         if frames_from_last_fall >= fall_period {
             frames_from_last_fall = 0;
@@ -133,6 +140,8 @@ async fn game_loop(stdout: &mut Stdout) {
             }
 
             if !piece.try_move(&field, Vec2(0, -1)) {
+                are_timer = get_are_delay(&piece);
+
                 piece.settle(&mut field);
 
                 if let Some(burn) = Burn::new(&field) {
@@ -164,6 +173,11 @@ async fn game_loop(stdout: &mut Stdout) {
         let level = (lines_cleared / 10) as u8;
         render::render(&field, score, level, Some(&piece), &next_piece, stdout);
     }
+}
+
+fn get_are_delay(piece: &Piece) -> usize {
+    let settle_height = (piece.position.1 - 3 + 2) as usize;
+    10 + (settle_height / 4) * 2
 }
 
 fn gravity_by_level(level: u8) -> usize {
