@@ -14,16 +14,17 @@ use crossterm::{
     terminal,
 };
 use futures::StreamExt;
-use tokio::{sync::mpsc, time::Instant};
+use tokio::sync::mpsc;
 
 // TODO:
-// Levels (increase speed and score rewards)
+// Proper random generation
+// Delay between lock and spawn
+// Level up animation
 
 const FIELD_WIDTH: usize = 10;
 const FIELD_HEIGHT: usize = 20;
 
-const FALL_PERIOD_NORMAL: Duration = Duration::from_millis(200);
-const FALL_PERIOD_SOFT_DROP: Duration = Duration::from_millis(50);
+const FALL_PERIOD_SOFT_DROP: usize = 2;
 
 const SOFT_DROP_SCORE_PER_CELL: u64 = 1;
 
@@ -72,11 +73,14 @@ async fn game_loop(stdout: &mut Stdout) {
 
     let mut events = listen_events();
 
-    let mut last_fall = Instant::now();
-    let mut fall_period = FALL_PERIOD_NORMAL;
+    let mut frames_from_last_fall = 0;
+    let mut fall_period_normal = gravity_by_level(0);
+    let mut fall_period = fall_period_normal;
+
+    let mut lines_cleared = 0;
 
     loop {
-        tokio::time::sleep(Duration::from_millis(10)).await;
+        tokio::time::sleep(Duration::from_millis(1000 / 60)).await;
 
         if !events.is_empty() {
             let event = events.recv().await.unwrap();
@@ -102,12 +106,13 @@ async fn game_loop(stdout: &mut Stdout) {
             }
 
             if event == soft_drop_released {
-                fall_period = FALL_PERIOD_NORMAL;
+                fall_period = fall_period_normal;
             }
         }
 
-        if last_fall.elapsed() >= fall_period {
-            last_fall = Instant::now();
+        frames_from_last_fall += 1;
+        if frames_from_last_fall >= fall_period {
+            frames_from_last_fall = 0;
 
             if fall_period == FALL_PERIOD_SOFT_DROP {
                 score += SOFT_DROP_SCORE_PER_CELL;
@@ -116,11 +121,15 @@ async fn game_loop(stdout: &mut Stdout) {
             if !piece.try_move(&field, Vec2(0, -1)) {
                 piece.settle(&mut field);
 
-                fall_period = FALL_PERIOD_NORMAL;
-
                 if let Some(burn) = Burn::new(&field) {
-                    burn.animate(&mut field, &mut score, stdout).await;
+                    lines_cleared += burn.get_row_count();
+                    fall_period_normal = gravity_by_level((lines_cleared / 10) as u8);
+
+                    burn.animate(&mut field, &mut score, lines_cleared / 10, stdout)
+                        .await;
                 }
+
+                fall_period = fall_period_normal;
 
                 try_lose(&mut field, &mut score, stdout).await;
 
@@ -129,6 +138,26 @@ async fn game_loop(stdout: &mut Stdout) {
         }
 
         render(&field, score, Some(&piece), stdout);
+    }
+}
+
+fn gravity_by_level(level: u8) -> usize {
+    match level {
+        0 => 48,
+        1 => 43,
+        2 => 38,
+        3 => 33,
+        4 => 28,
+        5 => 23,
+        6 => 18,
+        7 => 13,
+        8 => 8,
+        9 => 6,
+        10 | 11 | 12 => 5,
+        13 | 14 | 15 => 4,
+        16 | 17 | 18 => 3,
+        19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 => 2,
+        _ => 1,
     }
 }
 
@@ -377,7 +406,17 @@ impl Burn {
         }
     }
 
-    async fn animate(self, field: &mut Field, score: &mut Score, stdout: &mut Stdout) {
+    fn get_row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    async fn animate(
+        self,
+        field: &mut Field,
+        score: &mut Score,
+        level: usize,
+        stdout: &mut Stdout,
+    ) {
         for step in 0..FIELD_WIDTH {
             for row in &self.rows {
                 field.set_color_at(step + 3, *row, Color::None);
@@ -389,10 +428,10 @@ impl Burn {
         }
 
         *score += match self.rows.len() {
-            1 => 100,
-            2 => 300,
-            3 => 500,
-            4 => 800,
+            1 => 40 * (level as u64 + 1),
+            2 => 100 * (level as u64 + 1),
+            3 => 300 * (level as u64 + 1),
+            4 => 1200 * (level as u64 + 1),
             _ => unreachable!(),
         };
 
