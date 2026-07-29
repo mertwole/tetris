@@ -19,7 +19,6 @@ impl Field {
         !is_inside
     }
 
-    // TODO: Don't do bound checks in most cases.
     pub fn color_at(&self, mut x: usize, mut y: usize) -> Option<Color> {
         if Self::is_out_of_bounds(x, y) {
             return None;

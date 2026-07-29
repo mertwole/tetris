@@ -134,10 +134,13 @@ impl Piece {
             RotationDirection::Ccw => self.rotation + 3,
         } % 4;
 
-        let fits = self
-            .get_positions()
-            .into_iter()
-            .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
+        let fits = self.get_positions().into_iter().all(|pos| {
+            match field.color_at(pos.0 as usize, pos.1 as usize) {
+                Some(Color::None) => true,
+                None if (3..=FIELD_WIDTH + 3 - 1).contains(&(pos.0 as usize)) && pos.1 > 3 => true,
+                _ => false,
+            }
+        });
 
         if fits {
             return true;
