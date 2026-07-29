@@ -56,21 +56,17 @@ pub fn render(
     let mut next_piece = next_piece.clone();
     next_piece.position.1 -= 2;
     next_piece.position.0 += FIELD_WIDTH as isize;
-    render_piece(&next_piece, false, stdout);
+    render_piece(&next_piece, stdout);
 
     if let Some(piece) = piece {
-        render_piece(piece, true, stdout);
+        render_piece(piece, stdout);
     }
 
     stdout.flush().unwrap();
 }
 
-fn render_piece(piece: &Piece, bound_check: bool, stdout: &mut Stdout) {
+fn render_piece(piece: &Piece, stdout: &mut Stdout) {
     for position in piece.get_positions() {
-        if bound_check && Field::is_out_of_bounds(position.0 as usize, position.1 as usize) {
-            continue;
-        }
-
         let symbol = apply_color_to_text(piece.get_color(), "██");
 
         stdout

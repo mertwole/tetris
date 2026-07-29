@@ -54,32 +54,15 @@ async fn main() {
 }
 
 async fn game_loop(stdout: &mut Stdout) {
+    let bindngs = InputBindings::new();
+    let mut events = listen_events();
+
     let mut field = Field::new();
 
     let mut piece = Piece::spawn(None);
     let mut next_piece = Piece::spawn(Some(piece.ty));
 
     let mut score: Score = 0;
-
-    let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
-    let move_left = Event::Key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
-    let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
-
-    let rotate_cw = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
-    let rotate_ccw = Event::Key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
-
-    let soft_drop_pressed = Event::Key(KeyEvent::new_with_kind(
-        KeyCode::Down,
-        KeyModifiers::empty(),
-        KeyEventKind::Press,
-    ));
-    let soft_drop_released = Event::Key(KeyEvent::new_with_kind(
-        KeyCode::Down,
-        KeyModifiers::empty(),
-        KeyEventKind::Release,
-    ));
-
-    let mut events = listen_events();
 
     let mut frames_from_last_fall = 0;
     let mut fall_period_normal = gravity_by_level(0);
@@ -89,38 +72,32 @@ async fn game_loop(stdout: &mut Stdout) {
 
     let mut are_timer = 0;
 
+    let mut soft_dropping = false;
+    let mut soft_drop_score: Score = 0;
+
     loop {
         tokio::time::sleep(Duration::from_millis(1000 / 60)).await;
 
         if !events.is_empty() {
             let event = events.recv().await.unwrap();
 
-            if event == ctrl_c {
+            if event == bindngs.ctrl_c {
                 return;
-            }
-
-            if event == move_left {
+            } else if event == bindngs.move_left {
                 piece.try_move(&field, Vec2(-1, 0));
-            }
-
-            if event == move_right {
+            } else if event == bindngs.move_right {
                 piece.try_move(&field, Vec2(1, 0));
-            }
-
-            if event == rotate_cw {
+            } else if event == bindngs.rotate_cw {
                 piece.try_rotate(&field, RotationDirection::Cw);
-            }
-
-            if event == rotate_ccw {
+            } else if event == bindngs.rotate_ccw {
                 piece.try_rotate(&field, RotationDirection::Ccw);
-            }
-
-            if event == soft_drop_pressed {
+            } else if event == bindngs.soft_drop_pressed {
                 fall_period = FALL_PERIOD_SOFT_DROP;
-            }
-
-            if event == soft_drop_released {
+                soft_dropping = true;
+            } else if event == bindngs.soft_drop_released {
                 fall_period = fall_period_normal;
+                soft_dropping = false;
+                soft_drop_score = 0;
             }
         }
 
@@ -133,14 +110,21 @@ async fn game_loop(stdout: &mut Stdout) {
         if frames_from_last_fall >= fall_period {
             frames_from_last_fall = 0;
 
-            if fall_period == FALL_PERIOD_SOFT_DROP {
-                score += SOFT_DROP_SCORE_PER_CELL;
+            if soft_dropping {
+                soft_drop_score += SOFT_DROP_SCORE_PER_CELL;
             }
 
             if !piece.try_move(&field, Vec2(0, -1)) {
                 are_timer = get_are_delay(&piece);
 
                 piece.settle(&mut field);
+
+                if soft_dropping {
+                    score += soft_drop_score;
+                }
+
+                soft_dropping = false;
+                soft_drop_score = 0;
 
                 let level = (lines_cleared / 10) as u8;
                 lines_cleared += burn::try_burn(&mut field, &next_piece, &mut score, level, stdout)
@@ -193,6 +177,48 @@ fn gravity_by_level(level: u8) -> usize {
         16..=18 => 3,
         19..=28 => 2,
         _ => 1,
+    }
+}
+
+struct InputBindings {
+    ctrl_c: Event,
+    move_left: Event,
+    move_right: Event,
+    rotate_cw: Event,
+    rotate_ccw: Event,
+    soft_drop_pressed: Event,
+    soft_drop_released: Event,
+}
+
+impl InputBindings {
+    fn new() -> Self {
+        let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        let move_left = Event::Key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+        let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+
+        let rotate_cw = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
+        let rotate_ccw = Event::Key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+
+        let soft_drop_pressed = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::empty(),
+            KeyEventKind::Press,
+        ));
+        let soft_drop_released = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::empty(),
+            KeyEventKind::Release,
+        ));
+
+        Self {
+            ctrl_c,
+            move_left,
+            move_right,
+            rotate_cw,
+            rotate_ccw,
+            soft_drop_pressed,
+            soft_drop_released,
+        }
     }
 }
 
