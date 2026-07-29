@@ -24,8 +24,6 @@ mod piece;
 use piece::Piece;
 
 mod burn;
-use burn::Burn;
-
 mod lose;
 mod render;
 
@@ -144,15 +142,13 @@ async fn game_loop(stdout: &mut Stdout) {
 
                 piece.settle(&mut field);
 
-                if let Some(burn) = Burn::new(&field) {
-                    lines_cleared += burn.get_row_count();
-                    let level = (lines_cleared / 10) as u8;
+                let level = (lines_cleared / 10) as u8;
+                lines_cleared += burn::try_burn(&mut field, &next_piece, &mut score, level, stdout)
+                    .await
+                    .burned_rows;
 
-                    fall_period_normal = gravity_by_level(level);
-
-                    burn.animate(&mut field, &next_piece, &mut score, level, stdout)
-                        .await;
-                }
+                let level = (lines_cleared / 10) as u8;
+                fall_period_normal = gravity_by_level(level);
 
                 fall_period = fall_period_normal;
 
