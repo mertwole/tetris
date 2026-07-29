@@ -44,7 +44,7 @@ impl Piece {
 
         Self {
             ty,
-            position: Vec2(7, 23),
+            position: Vec2(8, 22),
             rotation: 0,
         }
     }
@@ -64,36 +64,30 @@ impl Piece {
     pub fn get_positions(&self) -> [Vec2; 4] {
         let positions = match (self.ty, self.rotation) {
             (PieceType::J, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-            (PieceType::J, 1) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(0, 1)],
+            (PieceType::J, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(-1, -1), Vec2(0, -1)],
             (PieceType::J, 2) => [Vec2(-1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::J, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(1, 1)],
+            (PieceType::J, 3) => [Vec2(0, 1), Vec2(1, 1), Vec2(0, 0), Vec2(0, -1)],
 
-            (PieceType::L, 0) => [Vec2(-1, -1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::L, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(-1, -1)],
             (PieceType::L, 1) => [Vec2(-1, 1), Vec2(0, 1), Vec2(0, 0), Vec2(0, -1)],
-            (PieceType::L, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, 1)],
+            (PieceType::L, 2) => [Vec2(1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
             (PieceType::L, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
 
-            (PieceType::S, 0) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::S, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-            (PieceType::S, 2) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::S, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
+            (PieceType::S, 0 | 2) => [Vec2(0, 0), Vec2(1, 0), Vec2(-1, -1), Vec2(0, -1)],
+            (PieceType::S, 1 | 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
 
-            (PieceType::Z, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::Z, 1) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
-            (PieceType::Z, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::Z, 3) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
+            (PieceType::Z, 0 | 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
+            (PieceType::Z, 1 | 3) => [Vec2(1, 1), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
 
-            (PieceType::T, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, 0)],
-            (PieceType::T, 1) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(0, -1)],
-            (PieceType::T, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(1, 0)],
+            (PieceType::T, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
+            (PieceType::T, 1) => [Vec2(0, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1)],
+            (PieceType::T, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(0, 1)],
             (PieceType::T, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
 
-            (PieceType::I, 0) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::I, 1) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
-            (PieceType::I, 2) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::I, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
+            (PieceType::I, 0 | 2) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
+            (PieceType::I, 1 | 3) => [Vec2(0, 2), Vec2(0, 1), Vec2(0, 0), Vec2(0, -1)],
 
-            (PieceType::O, _) => [Vec2(0, 0), Vec2(0, 1), Vec2(1, 1), Vec2(1, 0)],
+            (PieceType::O, _) => [Vec2(-1, 0), Vec2(0, 0), Vec2(-1, -1), Vec2(0, -1)],
             _ => unreachable!(),
         };
 
