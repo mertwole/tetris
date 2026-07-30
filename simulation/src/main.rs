@@ -84,9 +84,15 @@ async fn game_loop(stdout: &mut Stdout) {
             if event == bindngs.ctrl_c {
                 return;
             } else if event == bindngs.move_left {
-                piece.try_move(&field, Vec2(-1, 0));
+                // TODO: DAS (16 frames initial delay then shift every 6 frames).
+                if !soft_dropping {
+                    piece.try_move(&field, Vec2(-1, 0));
+                }
             } else if event == bindngs.move_right {
-                piece.try_move(&field, Vec2(1, 0));
+                // TODO: DAS (16 frames initial delay then shift every 6 frames).
+                if !soft_dropping {
+                    piece.try_move(&field, Vec2(1, 0));
+                }
             } else if event == bindngs.rotate_cw {
                 piece.try_rotate(&field, RotationDirection::Cw);
             } else if event == bindngs.rotate_ccw {
