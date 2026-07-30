@@ -10,15 +10,16 @@ use crate::{
 
 pub async fn try_lose(
     field: &mut Field,
+    piece: &Piece,
     next_piece: &Piece,
     score: &mut Score,
     lines_cleared: &mut usize,
     stdout: &mut Stdout,
 ) {
-    let y = FIELD_HEIGHT + 3 - 1;
-    let lost = (3..FIELD_WIDTH + 3)
-        .map(|x| field.color_at(x, y))
-        .any(|color| color != Some(Color::None));
+    let lost = !piece
+        .get_positions()
+        .iter()
+        .all(|&pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
 
     if lost {
         for y in (3..FIELD_HEIGHT + 3).rev() {

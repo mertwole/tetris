@@ -136,17 +136,19 @@ async fn game_loop(stdout: &mut Stdout) {
 
                 fall_period = fall_period_normal;
 
+                piece = next_piece;
+                next_piece = Piece::spawn(Some(piece.ty));
+
+                // TOOD: Clear the next piece after lose.
                 lose::try_lose(
                     &mut field,
+                    &piece,
                     &next_piece,
                     &mut score,
                     &mut lines_cleared,
                     stdout,
                 )
                 .await;
-
-                piece = next_piece;
-                next_piece = Piece::spawn(Some(piece.ty));
             }
         }
 
