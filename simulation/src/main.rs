@@ -1,23 +1,31 @@
 use std::{
-    io::{self, Stdout, Write},
+    io::{self, Stdout},
     time::Duration,
-    unreachable,
 };
 
 use crossterm::{
-    ExecutableCommand, QueueableCommand, cursor,
+    ExecutableCommand, cursor,
     event::{
         Event, EventStream, KeyCode, KeyEvent, KeyEventKind, KeyModifiers,
         KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
-    style::{self, StyledContent, Stylize},
     terminal,
 };
 use futures::StreamExt;
 use tokio::sync::mpsc;
 
-const FIELD_WIDTH: usize = 10;
-const FIELD_HEIGHT: usize = 20;
+mod field;
+use field::Field;
+
+mod common;
+use common::*;
+
+mod piece;
+use piece::Piece;
+
+mod burn;
+mod lose;
+mod render;
 
 const FALL_PERIOD_SOFT_DROP: usize = 2;
 
@@ -46,30 +54,15 @@ async fn main() {
 }
 
 async fn game_loop(stdout: &mut Stdout) {
+    let bindngs = InputBindings::new();
+    let mut events = listen_events();
+
     let mut field = Field::new();
 
     let mut piece = Piece::spawn(None);
     let mut next_piece = Piece::spawn(Some(piece.ty));
 
     let mut score: Score = 0;
-
-    let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
-    let move_left = Event::Key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
-    let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
-    let rotate = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
-
-    let soft_drop_pressed = Event::Key(KeyEvent::new_with_kind(
-        KeyCode::Down,
-        KeyModifiers::empty(),
-        KeyEventKind::Press,
-    ));
-    let soft_drop_released = Event::Key(KeyEvent::new_with_kind(
-        KeyCode::Down,
-        KeyModifiers::empty(),
-        KeyEventKind::Release,
-    ));
-
-    let mut events = listen_events();
 
     let mut frames_from_last_fall = 0;
     let mut fall_period_normal = gravity_by_level(0);
@@ -79,34 +72,38 @@ async fn game_loop(stdout: &mut Stdout) {
 
     let mut are_timer = 0;
 
+    let mut soft_dropping = false;
+    let mut soft_drop_score: Score = 0;
+
     loop {
         tokio::time::sleep(Duration::from_millis(1000 / 60)).await;
 
         if !events.is_empty() {
             let event = events.recv().await.unwrap();
 
-            if event == ctrl_c {
+            if event == bindngs.ctrl_c {
                 return;
-            }
-
-            if event == move_left {
-                piece.try_move(&field, Vec2(-1, 0));
-            }
-
-            if event == move_right {
-                piece.try_move(&field, Vec2(1, 0));
-            }
-
-            if event == rotate {
+            } else if event == bindngs.move_left {
+                // TODO: DAS (16 frames initial delay then shift every 6 frames).
+                if !soft_dropping {
+                    piece.try_move(&field, Vec2(-1, 0));
+                }
+            } else if event == bindngs.move_right {
+                // TODO: DAS (16 frames initial delay then shift every 6 frames).
+                if !soft_dropping {
+                    piece.try_move(&field, Vec2(1, 0));
+                }
+            } else if event == bindngs.rotate_cw {
                 piece.try_rotate(&field, RotationDirection::Cw);
-            }
-
-            if event == soft_drop_pressed {
+            } else if event == bindngs.rotate_ccw {
+                piece.try_rotate(&field, RotationDirection::Ccw);
+            } else if event == bindngs.soft_drop_pressed {
                 fall_period = FALL_PERIOD_SOFT_DROP;
-            }
-
-            if event == soft_drop_released {
+                soft_dropping = true;
+            } else if event == bindngs.soft_drop_released {
                 fall_period = fall_period_normal;
+                soft_dropping = false;
+                soft_drop_score = 0;
             }
         }
 
@@ -119,8 +116,8 @@ async fn game_loop(stdout: &mut Stdout) {
         if frames_from_last_fall >= fall_period {
             frames_from_last_fall = 0;
 
-            if fall_period == FALL_PERIOD_SOFT_DROP {
-                score += SOFT_DROP_SCORE_PER_CELL;
+            if soft_dropping {
+                soft_drop_score += SOFT_DROP_SCORE_PER_CELL;
             }
 
             if !piece.try_move(&field, Vec2(0, -1)) {
@@ -128,34 +125,41 @@ async fn game_loop(stdout: &mut Stdout) {
 
                 piece.settle(&mut field);
 
-                if let Some(burn) = Burn::new(&field) {
-                    lines_cleared += burn.get_row_count();
-                    let level = (lines_cleared / 10) as u8;
-
-                    fall_period_normal = gravity_by_level(level);
-
-                    burn.animate(&mut field, &next_piece, &mut score, level, stdout)
-                        .await;
+                if soft_dropping {
+                    score += soft_drop_score;
                 }
+
+                soft_dropping = false;
+                soft_drop_score = 0;
+
+                let level = (lines_cleared / 10) as u8;
+                lines_cleared += burn::try_burn(&mut field, &next_piece, &mut score, level, stdout)
+                    .await
+                    .burned_rows;
+
+                let level = (lines_cleared / 10) as u8;
+                fall_period_normal = gravity_by_level(level);
 
                 fall_period = fall_period_normal;
 
-                try_lose(
+                piece = next_piece;
+                next_piece = Piece::spawn(Some(piece.ty));
+
+                // TOOD: Clear the next piece after lose.
+                lose::try_lose(
                     &mut field,
+                    &piece,
                     &next_piece,
                     &mut score,
                     &mut lines_cleared,
                     stdout,
                 )
                 .await;
-
-                piece = next_piece;
-                next_piece = Piece::spawn(Some(piece.ty));
             }
         }
 
         let level = (lines_cleared / 10) as u8;
-        render(&field, score, level, Some(&piece), &next_piece, stdout);
+        render::render(&field, score, level, Some(&piece), &next_piece, stdout);
     }
 }
 
@@ -176,11 +180,53 @@ fn gravity_by_level(level: u8) -> usize {
         7 => 13,
         8 => 8,
         9 => 6,
-        10 | 11 | 12 => 5,
-        13 | 14 | 15 => 4,
-        16 | 17 | 18 => 3,
-        19 | 20 | 21 | 22 | 23 | 24 | 25 | 26 | 27 | 28 => 2,
+        10..=12 => 5,
+        13..=15 => 4,
+        16..=18 => 3,
+        19..=28 => 2,
         _ => 1,
+    }
+}
+
+struct InputBindings {
+    ctrl_c: Event,
+    move_left: Event,
+    move_right: Event,
+    rotate_cw: Event,
+    rotate_ccw: Event,
+    soft_drop_pressed: Event,
+    soft_drop_released: Event,
+}
+
+impl InputBindings {
+    fn new() -> Self {
+        let ctrl_c = Event::Key(KeyEvent::new(KeyCode::Char('c'), KeyModifiers::CONTROL));
+        let move_left = Event::Key(KeyEvent::new(KeyCode::Left, KeyModifiers::empty()));
+        let move_right = Event::Key(KeyEvent::new(KeyCode::Right, KeyModifiers::empty()));
+
+        let rotate_cw = Event::Key(KeyEvent::new(KeyCode::Char(' '), KeyModifiers::empty()));
+        let rotate_ccw = Event::Key(KeyEvent::new(KeyCode::Backspace, KeyModifiers::empty()));
+
+        let soft_drop_pressed = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::empty(),
+            KeyEventKind::Press,
+        ));
+        let soft_drop_released = Event::Key(KeyEvent::new_with_kind(
+            KeyCode::Down,
+            KeyModifiers::empty(),
+            KeyEventKind::Release,
+        ));
+
+        Self {
+            ctrl_c,
+            move_left,
+            move_right,
+            rotate_cw,
+            rotate_ccw,
+            soft_drop_pressed,
+            soft_drop_released,
+        }
     }
 }
 
@@ -197,415 +243,4 @@ fn listen_events() -> mpsc::Receiver<Event> {
     });
 
     receiver
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Vec2(isize, isize);
-
-#[derive(Clone, Debug)]
-struct Piece {
-    ty: PieceType,
-    position: Vec2,
-    // In range 0..4
-    rotation: u8,
-}
-
-#[derive(Clone, Copy, Debug)]
-#[repr(usize)]
-enum PieceType {
-    I = 0,
-    J,
-    O,
-    L,
-    S,
-    T,
-    Z,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum RotationDirection {
-    Cw,
-    Ccw,
-}
-
-impl Piece {
-    fn spawn(last_piece: Option<PieceType>) -> Self {
-        let mut roll = rand::random_range(0..8usize);
-        let last_piece = last_piece.map(|piece| piece as usize).unwrap_or(7);
-        if roll == 7 || roll == last_piece {
-            roll = rand::random_range(0..7usize);
-        }
-
-        let ty = match roll {
-            0 => PieceType::I,
-            1 => PieceType::J,
-            2 => PieceType::O,
-            3 => PieceType::L,
-            4 => PieceType::S,
-            5 => PieceType::T,
-            6 => PieceType::Z,
-            _ => unreachable!(),
-        };
-
-        Self {
-            ty,
-            position: Vec2(7, 23),
-            rotation: 0,
-        }
-    }
-
-    fn get_color(&self) -> Color {
-        match self.ty {
-            PieceType::I => Color::Blue,
-            PieceType::J => Color::Cyan,
-            PieceType::L => Color::DarkYellow,
-            PieceType::O => Color::Green,
-            PieceType::S => Color::Magenta,
-            PieceType::Z => Color::Red,
-            PieceType::T => Color::Yellow,
-        }
-    }
-
-    fn get_positions(&self) -> [Vec2; 4] {
-        let positions = match (self.ty, self.rotation) {
-            (PieceType::J, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-            (PieceType::J, 1) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(0, 1)],
-            (PieceType::J, 2) => [Vec2(-1, 1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::J, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(1, 1)],
-
-            (PieceType::L, 0) => [Vec2(-1, -1), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::L, 1) => [Vec2(-1, 1), Vec2(0, 1), Vec2(0, 0), Vec2(0, -1)],
-            (PieceType::L, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0), Vec2(1, 1)],
-            (PieceType::L, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-
-            (PieceType::S, 0) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::S, 1) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-            (PieceType::S, 2) => [Vec2(-1, -1), Vec2(0, -1), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::S, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(1, -1)],
-
-            (PieceType::Z, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::Z, 1) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
-            (PieceType::Z, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, -1)],
-            (PieceType::Z, 3) => [Vec2(1, 1), Vec2(1, 0), Vec2(0, 0), Vec2(0, -1)],
-
-            (PieceType::T, 0) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, -1), Vec2(1, 0)],
-            (PieceType::T, 1) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(0, -1)],
-            (PieceType::T, 2) => [Vec2(-1, 0), Vec2(0, 0), Vec2(0, 1), Vec2(1, 0)],
-            (PieceType::T, 3) => [Vec2(0, 1), Vec2(0, 0), Vec2(1, 0), Vec2(0, -1)],
-
-            (PieceType::I, 0) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::I, 1) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
-            (PieceType::I, 2) => [Vec2(-2, 0), Vec2(-1, 0), Vec2(0, 0), Vec2(1, 0)],
-            (PieceType::I, 3) => [Vec2(0, -1), Vec2(0, 0), Vec2(0, 1), Vec2(0, 2)],
-
-            (PieceType::O, _) => [Vec2(0, 0), Vec2(0, 1), Vec2(1, 1), Vec2(1, 0)],
-            _ => unreachable!(),
-        };
-
-        positions.map(|pos| Vec2(pos.0 + self.position.0, pos.1 + self.position.1))
-    }
-
-    fn try_move(&mut self, field: &Field, direction: Vec2) -> bool {
-        let prev_position = self.position;
-
-        self.position.0 = self.position.0 + direction.0;
-        self.position.1 = self.position.1 + direction.1;
-
-        for position in self.get_positions() {
-            match field.color_at(position.0 as usize, position.1 as usize) {
-                Some(Color::None) => {}
-                None => {
-                    if position.1 < 3 || position.0 < 3 || position.0 > FIELD_WIDTH as isize + 3 - 1
-                    {
-                        self.position = prev_position;
-                        return false;
-                    }
-                }
-                _ => {
-                    self.position = prev_position;
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
-
-    fn try_rotate(&mut self, field: &Field, direction: RotationDirection) -> bool {
-        let prev_rotation = self.rotation;
-
-        self.rotation = match direction {
-            RotationDirection::Cw => self.rotation + 1,
-            RotationDirection::Ccw => self.rotation + 3,
-        } % 4;
-
-        let fits = self
-            .get_positions()
-            .into_iter()
-            .all(|pos| field.color_at(pos.0 as usize, pos.1 as usize) == Some(Color::None));
-
-        if fits {
-            return true;
-        }
-
-        self.rotation = prev_rotation;
-
-        false
-    }
-
-    fn settle(&self, field: &mut Field) {
-        for position in self.get_positions() {
-            field.set_color_at(position.0 as usize, position.1 as usize, self.get_color());
-        }
-    }
-}
-
-struct Burn {
-    rows: Vec<usize>,
-}
-
-impl Burn {
-    fn new(field: &Field) -> Option<Self> {
-        let mut rows = vec![];
-        for row in 3..FIELD_HEIGHT + 3 {
-            let to_burn = (3..FIELD_WIDTH + 3)
-                .map(|x| field.color_at(x, row))
-                .all(|color| match color {
-                    None => false,
-                    Some(Color::None) => false,
-                    _ => true,
-                });
-
-            if to_burn {
-                rows.push(row);
-            }
-        }
-
-        if rows.is_empty() {
-            None
-        } else {
-            Some(Self { rows })
-        }
-    }
-
-    fn get_row_count(&self) -> usize {
-        self.rows.len()
-    }
-
-    async fn animate(
-        self,
-        field: &mut Field,
-        next_piece: &Piece,
-        score: &mut Score,
-        level: u8,
-        stdout: &mut Stdout,
-    ) {
-        for step in 0..FIELD_WIDTH {
-            for row in &self.rows {
-                field.set_color_at(step + 3, *row, Color::None);
-            }
-
-            tokio::time::sleep(Duration::from_millis(20)).await;
-            // Invariant: Piece is not visible during the burn.
-            render(field, *score, level, None, next_piece, stdout);
-        }
-
-        *score += match self.rows.len() {
-            1 => 40 * (level as u64 + 1),
-            2 => 100 * (level as u64 + 1),
-            3 => 300 * (level as u64 + 1),
-            4 => 1200 * (level as u64 + 1),
-            _ => unreachable!(),
-        };
-
-        let mut already_processed = 0;
-        for mut row in self.rows {
-            row -= already_processed;
-
-            for y in row + 1..FIELD_HEIGHT + 3 {
-                for x in 3..FIELD_WIDTH + 3 {
-                    field.set_color_at(x, y - 1, field.color_at(x, y).unwrap());
-                }
-            }
-
-            already_processed += 1;
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            // Invariant: Piece is not visible during the burn.
-            render(field, *score, level, None, next_piece, stdout);
-        }
-    }
-}
-
-async fn try_lose(
-    field: &mut Field,
-    next_piece: &Piece,
-    score: &mut Score,
-    lines_cleared: &mut usize,
-    stdout: &mut Stdout,
-) {
-    let y = FIELD_HEIGHT + 3 - 1;
-    let lost = (3..FIELD_WIDTH + 3)
-        .map(|x| field.color_at(x, y))
-        .any(|color| color != Some(Color::None));
-
-    if lost {
-        for y in (3..FIELD_HEIGHT + 3).rev() {
-            for x in 3..FIELD_WIDTH + 3 {
-                field.set_color_at(x, y, Color::None);
-            }
-
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            // Invariant: Piece is not visible during the lose.
-            render(
-                field,
-                *score,
-                (*lines_cleared / 10) as u8,
-                None,
-                next_piece,
-                stdout,
-            );
-        }
-
-        *score = 0;
-        *lines_cleared = 0;
-    }
-}
-
-struct Field {
-    rows: [[Color; FIELD_WIDTH]; FIELD_HEIGHT],
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Color {
-    None,
-    Yellow,
-    Red,
-    DarkYellow,
-    Blue,
-    Cyan,
-    Magenta,
-    Green,
-}
-
-impl Color {
-    fn apply_to_text<'a>(&self, text: &'a str) -> StyledContent<&'a str> {
-        match self {
-            Color::None => text.black(),
-            Color::Yellow => text.yellow(),
-            Color::Red => text.red(),
-            Color::DarkYellow => text.dark_yellow(),
-            Color::Blue => text.blue(),
-            Color::Cyan => text.cyan(),
-            Color::Magenta => text.magenta(),
-            Color::Green => text.green(),
-        }
-    }
-}
-
-impl Field {
-    fn new() -> Self {
-        Self {
-            rows: [[Color::None; 10]; 20],
-        }
-    }
-
-    fn is_out_of_bounds(x: usize, y: usize) -> bool {
-        x < 3 || x > FIELD_WIDTH + 3 - 1 || y < 3 || y > FIELD_HEIGHT + 3 - 1
-    }
-
-    // TODO: Don't do bound checks in most cases.
-    fn color_at(&self, mut x: usize, mut y: usize) -> Option<Color> {
-        if Self::is_out_of_bounds(x, y) {
-            return None;
-        }
-
-        x -= 3;
-        y -= 3;
-
-        Some(self.rows[y][x])
-    }
-
-    fn set_color_at(&mut self, mut x: usize, mut y: usize, color: Color) {
-        if Self::is_out_of_bounds(x, y) {
-            return;
-        }
-
-        x -= 3;
-        y -= 3;
-
-        self.rows[y][x] = color;
-    }
-}
-
-fn render(
-    field: &Field,
-    score: Score,
-    level: u8,
-    piece: Option<&Piece>,
-    next_piece: &Piece,
-    stdout: &mut Stdout,
-) {
-    stdout
-        .execute(terminal::Clear(terminal::ClearType::All))
-        .unwrap();
-
-    for y in 3..FIELD_HEIGHT + 3 {
-        for x in 3..FIELD_WIDTH + 3 {
-            let color = field.color_at(x, y);
-
-            let Some(color) = color else {
-                continue;
-            };
-
-            let symbol = color.apply_to_text("██");
-
-            stdout
-                .queue(cursor::MoveTo(
-                    x as u16 * 2,
-                    (FIELD_HEIGHT + 3 - 1 - y) as u16,
-                ))
-                .unwrap()
-                .queue(style::PrintStyledContent(symbol))
-                .unwrap();
-        }
-    }
-
-    stdout
-        .queue(cursor::MoveTo(6, FIELD_HEIGHT as u16))
-        .unwrap()
-        .queue(style::PrintStyledContent(
-            format!("score: {}  level: {}", score, level).dark_magenta(),
-        ))
-        .unwrap();
-
-    let mut next_piece = next_piece.clone();
-    next_piece.position.1 -= 2;
-    next_piece.position.0 += FIELD_WIDTH as isize;
-    render_piece(&next_piece, false, stdout);
-
-    if let Some(piece) = piece {
-        render_piece(piece, true, stdout);
-    }
-
-    stdout.flush().unwrap();
-}
-
-fn render_piece(piece: &Piece, bound_check: bool, stdout: &mut Stdout) {
-    for position in piece.get_positions() {
-        if bound_check && Field::is_out_of_bounds(position.0 as usize, position.1 as usize) {
-            continue;
-        }
-
-        let symbol = piece.get_color().apply_to_text("██");
-
-        stdout
-            .queue(cursor::MoveTo(
-                position.0 as u16 * 2,
-                (FIELD_HEIGHT + 3 - 1 - position.1 as usize) as u16,
-            ))
-            .unwrap()
-            .queue(style::PrintStyledContent(symbol))
-            .unwrap();
-    }
 }
