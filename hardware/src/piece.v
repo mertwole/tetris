@@ -1,8 +1,11 @@
 module piece(
     input wire clk,
 
-    input wire rotate_cw,
-    input wire rotate_ccw,
+    input wire[2:0] spawned_type,
+
+    input wire[1:0] move_type,
+
+    input wire [1:0] rotation_type,
 
     input wire[1:0] read_index,
     output wire[3:0] cell_x,
@@ -26,6 +29,15 @@ module piece(
     output reg[2:0] type
 );
 
+localparam MOVE_TYPE_NONE = 'b00;
+localparam MOVE_TYPE_DOWN = 'b01;
+localparam MOVE_TYPE_LEFT = 'b10;
+localparam MOVE_TYPE_RIGHT = 'b11;
+
+localparam ROTATE_NONE = 'b00;
+localparam ROTATE_CW = 'b01;
+localparam ROTATE_CCW = 'b10;
+
 reg [3:0] x;
 reg [4:0] y;
 
@@ -37,7 +49,39 @@ assign cell_x = x + cell_x_offset;
 assign cell_y = y + cell_y_offset;
 
 always @(posedge clk) begin
-    rotation <= rotation + rotate_cw - rotate_ccw;
+    if spawn begin
+        rotation <= 0;
+        x <= 8;
+        y <= 22;
+        type <= spawned_type;
+    end else begin
+        case(rotation_type)
+            ROTATE_CW: rotation <= rotation + 1;
+            ROTATE_CCW: rotation <= rotation - 1;
+            default: rotation <= rotation;
+        endcase
+
+        type <= type;
+
+        case (move_type)
+            MOVE_TYPE_NONE: begin
+                x <= x;
+                y <= y;
+            end
+            MOVE_TYPE_DOWN: begin
+                x <= x;
+                y <= y - 1;
+            end
+            MOVE_TYPE_LEFT: begin
+                x <= x - 1;
+                y <= y;
+            end
+            MOVE_TYPE_RIGHT: begin
+                x <= x + 1;
+                y <= y;
+            end
+        endcase
+    end
 end
 
 function [8:0] get_cell_offsets(
