@@ -1,20 +1,50 @@
 module piece(
     input wire clk,
 
+    // Spawn a piece.
+    // 
+    // Setting this wire to any value except 'b000 will cause the piece to change its type to the 
+    // corresponding value and reset coordinates and rotation on the next clock cycle. Setting 'b000 will have 
+    // no effect.
     input wire[2:0] spawned_type,
 
-    input wire[1:0] move_type,
+    // Move the piece.
+    //
+    // Setting this wire to any value except 'b00 will cause the piece to move one block on the next frame. 
+    // Direction of the movement is defined as follows:
+    // 'b00 - No movement
+    // 'b01 - Move down
+    // 'b10 - Move left
+    // 'b11 - Move right
+    input wire[1:0] movement_in,
 
-    input wire [1:0] rotation_type,
+    // Rotate the piece.
+    //
+    // Setting this wire to any value except 'b00 will cause the piece to rotate on the next frame. Direction 
+    // of the rotation is defined as follows:
+    // 'b00 - No rotation
+    // 'b01 - Clockwise
+    // 'b10 - Counter-clockwise
+    // 'b11 - No rotation
+    input wire [1:0] rotation_in,
 
+    // Request to read specific cell.
+    // 
+    // Every piece consists of 4 cells, indexed from 0 to 3(inclusive). When `read_index` is set to some
+    // value, coordinates of the corresponding cell will appear on `cell_x` and `cell_y`.
+    //
+    // NOTE: Valid values appear on `cell_x` and `cell_y` on the same clock cycle when `read_index` was set.
     input wire[1:0] read_index,
-    output wire[3:0] cell_x,
-    output wire[4:0] cell_y,
 
-    /// Rotation of the piece.
-    /// 
-    /// Value of 'b00 corresponds to spawn orientation, 'b01 - spawn orientation turned clockwise and so on.
-    output reg[1:0] rotation,
+    // X coordinate of the cell being read.
+    //
+    // See `read_index` description for more details.
+    output wire[3:0] cell_x,
+
+    // Y coordinate of the cell being read.
+    //
+    // See `read_index` description for more details.
+    output wire[4:0] cell_y,
 
     // Type of the piece.
     //
@@ -41,6 +71,11 @@ localparam ROTATE_CCW = 'b10;
 reg [3:0] x;
 reg [4:0] y;
 
+// Rotation of the piece.
+// 
+// Value of 'b00 corresponds to spawn orientation, 'b01 - spawn orientation turned clockwise and so on.
+reg[1:0] rotation;
+
 wire cell_x_offset;
 wire cell_y_offset;
 
@@ -49,13 +84,13 @@ assign cell_x = x + cell_x_offset;
 assign cell_y = y + cell_y_offset;
 
 always @(posedge clk) begin
-    if spawn begin
+    if spawned_type != 'b000 begin
         rotation <= 0;
         x <= 8;
         y <= 22;
         type <= spawned_type;
     end else begin
-        case(rotation_type)
+        case(rotation_in)
             ROTATE_CW: rotation <= rotation + 1;
             ROTATE_CCW: rotation <= rotation - 1;
             default: rotation <= rotation;
@@ -63,7 +98,7 @@ always @(posedge clk) begin
 
         type <= type;
 
-        case (move_type)
+        case (movement_in)
             MOVE_TYPE_NONE: begin
                 x <= x;
                 y <= y;
