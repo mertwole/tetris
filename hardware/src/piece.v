@@ -95,27 +95,17 @@ always @(posedge clk) begin
         case(rotation_in)
             ROTATE_CW: rotation <= rotation + 1;
             ROTATE_CCW: rotation <= rotation - 1;
-            default: rotation <= rotation;
         endcase
 
-        type <= type;
-
         case (movement_in)
-            MOVE_TYPE_NONE: begin
-                x <= x;
-                y <= y;
-            end
             MOVE_TYPE_DOWN: begin
-                x <= x;
                 y <= y - 1;
             end
             MOVE_TYPE_LEFT: begin
                 x <= x - 1;
-                y <= y;
             end
             MOVE_TYPE_RIGHT: begin
                 x <= x + 1;
-                y <= y;
             end
         endcase
     end

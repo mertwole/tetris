@@ -55,8 +55,6 @@ always @(posedge clk) begin
         end else begin 
             type <= first_roll;
         end
-    end else begin
-        spawn_count <= spawn_count;
     end
 end
 
