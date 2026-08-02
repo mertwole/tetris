@@ -47,25 +47,19 @@ always @(posedge clk) begin
 
         lines_burned_from_last_time <= lines_burned_from_last_time + 1;
         lines_burned <= lines_burned + 1;
-        score <= score;
         
         if (lines_burned_mod_10 == 9) begin
             lines_burned_mod_10 <= 0;
             level <= level + 1;
         end else begin
             lines_burned_mod_10 <= lines_burned_mod_10 + 1;
-            level <= level;
         end
     end else if (commit_burned_lines) begin
         soft_drop_score <= 0;
 
         lines_burned_from_last_time <= 0;
-        lines_burned <= lines_burned;
-        lines_burned_mod_10 <= lines_burned_mod_10;
-        level <= level;
 
         case (lines_burned_from_last_time) 
-            0: score <= score;
             1: score <= score + 40 * (level + 1);
             2: score <= score + 100 * (level + 1);
             3: score <= score + 200 * (level + 1);
@@ -73,28 +67,11 @@ always @(posedge clk) begin
         endcase
     end else if (soft_dropping) begin
         soft_drop_score <= soft_drop_score + 1;
-
-        lines_burned_from_last_time <= 0;
-        lines_burned <= lines_burned;
-        lines_burned_mod_10 <= lines_burned_mod_10;
-        level <= level;
-        score <= score;
     end else if (reset_soft_drop_score) begin
         soft_drop_score <= 0;
-
-        lines_burned_from_last_time <= 0;
-        lines_burned <= lines_burned;
-        lines_burned_mod_10 <= lines_burned_mod_10;
-        level <= level;
-        score <= score;
     end else if (commit_soft_drop_score) begin
         soft_drop_score <= 0;
         score <= score + commit_soft_drop_score;
-
-        lines_burned_from_last_time <= 0;
-        lines_burned <= lines_burned;
-        lines_burned_mod_10 <= lines_burned_mod_10;
-        level <= level;
     end
 end
 
