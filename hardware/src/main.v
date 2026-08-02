@@ -52,7 +52,7 @@ module main (
     .locked  (clock_divider_locked),
     .clk_in1 (clk5x)
   );
-  
+
   field field_inst (
     .clk(clk1x)
     //.x(),
