@@ -18,7 +18,8 @@ localparam STATE_IDLE = 'b000;
 localparam STATE_SCANNING = 'b001;
 localparam STATE_PREPARE_TO_BURN = 'b010;
 localparam STATE_BURNING = 'b011;
-localparam STATE_FALLING = 'b100;
+localparam STATE_PREPARE_TO_FALLING = 'b100;
+localparam STATE_FALLING = 'b101;
 
 reg[2:0] state = STATE_IDLE;
 
@@ -30,6 +31,7 @@ reg[4:0] lines_to_burn [3:0];
 reg[2:0] amount_of_lines_to_burn = 0;
 reg[2:0] amount_of_burned_lines = 0;
 
+// TODO: Check that all registers are reset.
 always @(posedge clk) begin
     case(state)
     STATE_IDLE: begin
@@ -37,6 +39,7 @@ always @(posedge clk) begin
             state <= STATE_SCANNING;
             field_x <= 3;
             field_y <= 3;
+            field_write_enable <= 0;
             field_read_enable <= 1;
             is_current_line_complete <= 1;
             amount_of_lines_to_burn <= 0;
@@ -83,16 +86,42 @@ always @(posedge clk) begin
             amount_of_burned_lines <= 0;
 
             if (field_x == 12) begin
-                state <= STATE_FALLING;
+                state <= STATE_PREPARE_TO_FALLING;
             end
         end else begin
             amount_of_burned_lines <= amount_of_burned_lines + 1;
         end
     end
+    STATE_PREPARE_TO_FALLING: begin
+        field_write_enable <= 0;
+        field_read_enable <= 1;
+        field_x <= 3;
+        field_y <= lines_to_burn[amount_of_lines_to_burn - 1] + 1;
+    end
     STATE_FALLING: begin // TODO: Play animation.
-        // TODO
+        field_read_enable <= ~field_read_enable;
+        field_write_enable <= ~field_write_enable;
 
-        state <= STATE_IDLE;
+        if (field_read_enable) begin
+            field_y <= field_y - 1;
+            field_cell_write_value <= field_cell_read_value;
+        end else begin
+            field_x <= field_x + 1;
+            if (field_x == 12) begin
+                if (field_y == 21) begin
+                    amount_of_lines_to_burn <= amount_of_lines_to_burn - 1;
+                    field_y <= lines_to_burn[amount_of_lines_to_burn - 2] + 1;
+                    if (amount_of_lines_to_burn == 0) begin
+                        state <= STATE_IDLE;
+                        field_write_enable <= 0;
+                    end
+                end else begin
+                    field_y <= field_y + 2;
+                end
+            end else begin
+                field_y <= field_y + 1;
+            end
+        end
     end
     endcase
 end
