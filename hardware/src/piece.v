@@ -4,13 +4,15 @@ module piece(
     // Spawn a piece.
     // 
     // Setting this wire to any value except 'b000 will cause the piece to change its type to the 
-    // corresponding value and reset coordinates and rotation on the next clock cycle. Setting 'b000 will have 
-    // no effect.
+    // corresponding value and reset coordinates and rotation on the current clock cycle. Setting 'b000 will 
+    // have no effect.
     input wire[2:0] spawned_type,
 
     // Move the piece.
     //
-    // Setting this wire to any value except 'b00 will cause the piece to move one block on the next frame. 
+    // Setting this wire to any value except 'b00 will cause the piece to move one block on the current clock 
+    // cycle. 
+    // 
     // Direction of the movement is defined as follows:
     // 'b00 - No movement
     // 'b01 - Move down
@@ -20,8 +22,8 @@ module piece(
 
     // Rotate the piece.
     //
-    // Setting this wire to any value except 'b00 will cause the piece to rotate on the next frame. Direction 
-    // of the rotation is defined as follows:
+    // Setting this wire to any value except 'b00 will cause the piece to rotate on the current clock cycle. 
+    // Direction of the rotation is defined as follows:
     // 'b00 - No rotation
     // 'b01 - Clockwise
     // 'b10 - Counter-clockwise
@@ -33,7 +35,7 @@ module piece(
     // Every piece consists of 4 cells, indexed from 0 to 3(inclusive). When `read_index` is set to some
     // value, coordinates of the corresponding cell will appear on `cell_x` and `cell_y`.
     //
-    // NOTE: Valid values appear on `cell_x` and `cell_y` on the same clock cycle when `read_index` was set.
+    // NOTE: Valid values appear on `cell_x` and `cell_y` immediately.
     input wire[1:0] read_index,
 
     // X coordinate of the cell being read.

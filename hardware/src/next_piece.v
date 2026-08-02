@@ -9,7 +9,7 @@ module next_piece (
     // Every piece consists of 4 cells, indexed from 0 to 3(inclusive). When `read_index` is set to some
     // value, coordinates of the corresponding cell will appear on `cell_x` and `cell_y`.
     //
-    // NOTE: Valid values appear on `cell_x` and `cell_y` on the same clock cycle when `read_index` was set.
+    // NOTE: Valid values appear on `cell_x` and `cell_y` immediately.
     input wire[1:0] read_index,
 
     // X coordinate of the cell being read.
