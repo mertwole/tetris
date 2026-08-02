@@ -53,6 +53,8 @@ module main (
     .clk_in1 (clk5x)
   );
 
+  burn burn_inst();
+
   field field_inst (
     .clk(clk1x)
     //.x(),
