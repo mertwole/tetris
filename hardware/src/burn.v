@@ -1,16 +1,30 @@
 module burn (
     input wire clk,
 
+    // Start checking the complete lines and playing the burn animation.
     input wire start,
+    // Asserted when all the burn-related operations are complete.
     output wire done,
 
+    // X coordinate of the field cell, used for both read and write operations.
     output reg[3:0] field_x = 3,
+    // Y coordinate of the field cell, used for both read and write operations.
     output reg[4:0] field_y = 3,
 
+    // Request to read the field cell at coordinates (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_write_enable`.
     output reg field_read_enable = 0,
+    // Result of the field read operation initiated by asserting `field_read_enable`.
     input wire[2:0] field_cell_read_value,
 
+    // Request to write the value `field_cell_write_value` to the field cell at coordinates 
+    // (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_read_enable`.
     output reg field_write_enable = 0,
+    // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
+    // `field_write_enable` is asserted.
     output reg[2:0] field_cell_write_value = 0
 );
 
@@ -110,23 +124,30 @@ always @(posedge clk) begin
             if (field_read_enable) begin
                 field_y <= field_y - 1;
                 field_cell_write_value <= field_cell_read_value;
+
+                field_read_enable <= 0;
             end else begin
                 if (field_x == 12) begin
                     field_x <= 3;
                     if (field_y == 21) begin
-                        // Reuse this counter here.
+                        // NOTE: `amount_of_lines_to_burn` counter is reused here.
                         amount_of_lines_to_burn <= amount_of_lines_to_burn - 1;
                         field_y <= lines_to_burn[amount_of_lines_to_burn - 2] + 1;
                         if (amount_of_lines_to_burn == 0) begin
-                            // TODO: Disable read_enable.
                             state <= STATE_IDLE;
+                        end else begin
+                            field_read_enable <= 1;
                         end
                     end else begin
                         field_y <= field_y + 2;
+
+                        field_read_enable <= 1;
                     end
                 end else begin
                     field_x <= field_x + 1;
                     field_y <= field_y + 1;
+
+                    field_read_enable <= 1;
                 end
             end
         end
