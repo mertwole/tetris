@@ -27,9 +27,13 @@ module lose(
     // `field_write_enable` is asserted.
     output wire[2:0] field_cell_write_value = 0, // Lose animation can only erase the cells.
 
+    // Request to read th current piece cell at index `current_piece_read_index`.
     output reg current_piece_read_enable = 0,
+    // Index to read the current piece when `current_piece_read_enable` is asserted.
     output reg [1:0] current_piece_read_index = 0,
+    // X coordinate of the cell of the current piece.
     input wire[3:0] current_piece_cell_x,
+    // Y coordinate of the cell of the current piece.
     input wire[4:0] current_piece_cell_y
 );
 
