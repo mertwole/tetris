@@ -30,7 +30,7 @@ module lose(
     // Request to read th current piece cell at index `current_piece_read_index`.
     output reg current_piece_read_enable = 0,
     // Index to read the current piece when `current_piece_read_enable` is asserted.
-    output reg [1:0] current_piece_read_index = 0,
+    output wire [1:0] current_piece_read_index_out,
     // X coordinate of the cell of the current piece.
     input wire[3:0] current_piece_cell_x,
     // Y coordinate of the cell of the current piece.
@@ -49,6 +49,9 @@ assign done = state == STATE_IDLE;
 
 assign field_cell_write_value = 0; // Lose animation can only erase the cells.
 
+reg[2:0] current_piece_read_index = 0;
+assign current_piece_read_index_out = current_piece_read_index[1:0];
+
 always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
@@ -63,13 +66,14 @@ always @(posedge clk) begin
             field_x <= current_piece_cell_x;
             field_y <= current_piece_cell_y;   
             field_read_enable <= 1;
+            current_piece_read_index <= current_piece_read_index + 1;
 
             state <= STATE_SCANNING;
         end
         STATE_SCANNING: begin
-            if (current_piece_read_index == 3) begin
-                current_piece_read_index <= 0;
-
+            // It's checked with 4 because `field_cell_read_value` contains value of the field cell read in
+            // the previous clock cycle.
+            if (current_piece_read_index == 4) begin
                 if (field_cell_read_value != 'b000) begin
                     state <= STATE_PREPARE_TO_ANIMATE;
                 end else begin
@@ -87,6 +91,7 @@ always @(posedge clk) begin
             end
         end
         STATE_PREPARE_TO_ANIMATE: begin
+            current_piece_read_enable <= 0;
             field_read_enable <= 0;
             field_write_enable <= 1;
 
