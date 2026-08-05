@@ -25,7 +25,7 @@ module lose(
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.
-    output wire[2:0] field_cell_write_value = 0, // Lose animation can only erase the cells.
+    output wire[2:0] field_cell_write_value,
 
     // Request to read th current piece cell at index `current_piece_read_index`.
     output reg current_piece_read_enable = 0,
@@ -38,13 +38,16 @@ module lose(
 );
 
 localparam STATE_IDLE = 'b000;
-localparam STATE_SCANNING = 'b001;
-localparam STATE_PREPARE_TO_ANIMATE = 'b010;
-localparam STATE_ANIMATING = 'b011;
+localparam STATE_PREPARE_TO_SCAN = 'b001;
+localparam STATE_SCANNING = 'b010;
+localparam STATE_PREPARE_TO_ANIMATE = 'b011;
+localparam STATE_ANIMATING = 'b100;
 
 reg[2:0] state = STATE_IDLE;
 
 assign done = state == STATE_IDLE;
+
+assign field_cell_write_value = 0; // Lose animation can only erase the cells.
 
 always @(posedge clk) begin
     case(state)
@@ -52,13 +55,16 @@ always @(posedge clk) begin
             if (start) begin
                 current_piece_read_enable <= 1;
                 current_piece_read_index <= 0;
-                field_read_enable <= 1;
 
-                field_x <= current_piece_cell_x;
-                field_y <= current_piece_cell_y;
-
-                state <= STATE_SCANNING;
+                state <= STATE_PREPARE_TO_SCAN;
             end
+        end
+        STATE_PREPARE_TO_SCAN: begin
+            field_x <= current_piece_cell_x;
+            field_y <= current_piece_cell_y;   
+            field_read_enable <= 1;
+
+            state <= STATE_SCANNING;
         end
         STATE_SCANNING: begin
             if (current_piece_read_index == 3) begin
@@ -89,7 +95,7 @@ always @(posedge clk) begin
 
             state <= STATE_ANIMATING;
         end
-        STATE_ANIMATING: begin
+        STATE_ANIMATING: begin // TODO: Animate.
             if (field_x == 12) begin
                 field_x <= 3;
 
@@ -97,7 +103,7 @@ always @(posedge clk) begin
                     state <= STATE_IDLE;
                     field_write_enable <= 0;
                 end else begin
-                    field_y -= 1;
+                    field_y <= field_y - 1;
                 end
             end else begin
                 field_x <= field_x + 1;
