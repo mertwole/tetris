@@ -27,10 +27,11 @@ module game_loop(
     output reg start_burn = 0,
     input wire burn_done,
 
+    output reg start_lose = 0,
+    input wire lose_done,
+
     output reg generate_new_piece = 0,
 );
-
-localparam CLK_PER_FRAME = 100;
 
 localparam STATE_INIT = 'b0000;
 localparam STATE_PROCESSING_INPUT = 'b0001;
@@ -43,8 +44,14 @@ localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b0111;
 localparam STATE_WRITE_PIECE_TO_FIELD = 'b1000;
 localparam STATE_BURNING = 'b1001;
 localparam STATE_CHECK_LOSE = 'b1010;
+localparam STATE_RENDER = 'b1011;
+localparam STATE_PADDING = 'b1100;
 
 reg[3:0] state = STATE_INIT;
+
+localparam CLK_PER_FRAME = 100_000;
+
+reg[17:0] current_frame_duration = 0;
 
 reg soft_dropping = 0;
 reg[4:0] are_timer = 0;
@@ -58,6 +65,8 @@ wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 assign field_cell_write_value = current_piece_type; 
 
 always @(posedge clk) begin
+    current_frame_duration <= current_frame_duration + 1;
+
     case (state)
         STATE_INIT: begin
             // Initialize piece, field and so on.
@@ -103,7 +112,7 @@ always @(posedge clk) begin
                 if (field_cell_read_value != 'b000) begin
                     state <= STATE_SETTLED;
                 end else begin
-                    state <= // TODO: Transition to the state where the piece is not settled.
+                    state <= STATE_RENDER;
                 end
             end else begin
                 settlement_check_step <= settlement_check_step + 1;
@@ -122,6 +131,7 @@ always @(posedge clk) begin
 
             are_timer <= are_by_piece_position(current_piece_center_y);
 
+            // TODO:
             // - If soft dropping update the score with soft drop score 
             //        + reset soft drop score(unconditionally) + disable soft dropping
 
@@ -155,20 +165,31 @@ always @(posedge clk) begin
         end
         STATE_BURNING: begin
             start_burn <= 0;
+
             if (burn_done) begin
-                state <= STATE_CHECK_LOSE;
                 generate_new_piece <= 1;
+                start_lose <= 1;
+
+                state <= STATE_CHECK_LOSE;
             end
         end
         STATE_CHECK_LOSE: begin
             generate_new_piece <= 0;
+            start_lose <= 0;
 
-            // - Process lose
+            if(lose_done) begin
+                state <= STATE_RENDER; // TODO: Check the result.
+            end
         end
-
-        // TODO:
-        // - Render
-        // - Padding delay
+        STATE_RENDER: begin
+            // TODO: Implement it later.
+            state <= STATE_PADDING;
+        end
+        STATE_PADDING: begin
+            if (current_frame_duration == CLK_PER_FRAME - 1) begin
+                current_frame_duration <= 0;       
+            end
+        end
     endcase
 end
 
