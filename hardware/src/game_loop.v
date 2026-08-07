@@ -51,20 +51,20 @@ module game_loop(
     // Signalizes that the burn has completed.
     input wire burn_done,
 
-    // Start processing the lose.
-    output reg start_lose = 0,
-    // Signalizes that the lose has completed.
+    // Start checking for lose.
+    output reg start_lose_check = 0,
+    // Signalizes that the lose check/animation has completed.
     input wire lose_done,
 
     // Randomly generate the new piece.
     output reg generate_new_piece = 0,
 
     // Signalize a single movement in the soft drop mode.
-    input reg soft_dropping_movement = 0,
+    output reg soft_dropping_movement = 0,
     // Reset current soft drop score.
-    input reg reset_soft_drop_score = 0,
+    output reg reset_soft_drop_score = 0,
     // Commit the soft drop score.
-    input reg commit_soft_drop_score = 0
+    output reg commit_soft_drop_score = 0
 );
 
 localparam STATE_INIT = 'b0000;
@@ -151,7 +151,7 @@ always @(posedge clk) begin
         STATE_SETTLEMENT_CHECK: begin
             if (current_piece_read_index == 4) begin
                 if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLED;
+                    state <= STATE_SETTLE;
                 end else begin
                     state <= STATE_RENDER;
                 end
@@ -162,11 +162,11 @@ always @(posedge clk) begin
                 field_y <= current_piece_read_cell_y;
 
                 if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLED;
+                    state <= STATE_SETTLE;
                 end
             end
         end
-        STATE_SETTLED: begin
+        STATE_SETTLE: begin
             field_read_enable <= 0;
             piece_movement <= 'b01; // TODO: Use movement Up.
 
@@ -184,6 +184,8 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
             commit_soft_drop_score <= 0;
+
+            piece_movement <= 'b00;
 
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
@@ -211,14 +213,14 @@ always @(posedge clk) begin
 
             if (burn_done) begin
                 generate_new_piece <= 1;
-                start_lose <= 1;
+                start_lose_check <= 1;
 
                 state <= STATE_CHECK_LOSE;
             end
         end
         STATE_CHECK_LOSE: begin
             generate_new_piece <= 0;
-            start_lose <= 0;
+            start_lose_check <= 0;
 
             if(lose_done) begin
                 state <= STATE_RENDER; // TODO: Check the result.
