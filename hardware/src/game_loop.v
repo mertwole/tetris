@@ -10,10 +10,10 @@ module game_loop(
     // Enable read for the current piece.
     //
     // When it's enabled, piece cell coordinates will appear on `current_piece_read_cell_x` and 
-    // `current_piece_read_cell_y` when `current_piece_read_index` is set to the corresponding cell index.
+    // `current_piece_read_cell_y` when `current_piece_read_index_out` is set to the corresponding cell index.
     output reg current_piece_read_enable = 0,
     // An index of the current piece cell that's being read.
-    output wire[1:0] current_piece_read_index,
+    output wire[1:0] current_piece_read_index_out,
     // X coordinate of the current piece cell that's being read.
     input wire[3:0] current_piece_read_cell_x,
     // Y coordinate of the current piece cell that's being read.
@@ -57,7 +57,14 @@ module game_loop(
     input wire lose_done,
 
     // Randomly generate the new piece.
-    output reg generate_new_piece = 0
+    output reg generate_new_piece = 0,
+
+    // Signalize a single movement in the soft drop mode.
+    input reg soft_dropping_movement = 0,
+    // Reset current soft drop score.
+    input reg reset_soft_drop_score = 0,
+    // Commit the soft drop score.
+    input reg commit_soft_drop_score = 0
 );
 
 localparam STATE_INIT = 'b0000;
@@ -83,13 +90,14 @@ reg[17:0] current_frame_duration = 0;
 reg soft_dropping = 0;
 reg[4:0] are_timer = 0;
 reg[5:0] frames_from_last_fall = 0;
-reg[2:0] settlement_check_step = 0;
 
-assign current_piece_read_index = settlement_check_step[1:0];
+reg[2:0] current_piece_read_index = 0;
+assign current_piece_read_index_out = current_piece_read_index_out[1:0];
+
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 
 // Game loop can only write the piece type to the field.
-assign field_cell_write_value = current_piece_type; 
+assign field_cell_write_value = current_piece_type;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -113,36 +121,42 @@ always @(posedge clk) begin
             if (frames_from_last_fall + 1 >= current_gravity) begin
                 frames_from_last_fall <= 0;
 
-                // TODO: Increment soft drop score;
+                if (soft_dropping) begin
+                    soft_dropping_movement <= 1;
+                end
 
                 piece_movement <= 'b01; // TODO: use param.
                 current_piece_read_enable <= 1;
-                settlement_check_step <= 0;
+                current_piece_read_index <= 0;
                 
                 state <= STATE_PREPARE_TO_SETTLEMENT_CHECK;
             end else begin
                 frames_from_last_fall <= frames_from_last_fall + 1;
+
+                state <= STATE_PROCESSING_INPUT;
             end
         end
         STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
+            soft_dropping_movement <= 0;
+
             piece_movement <= 'b00;
 
             field_read_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
-            settlement_check_step <= settlement_check_step + 1;
+            current_piece_read_index <= current_piece_read_index + 1;
 
             state <= STATE_SETTLEMENT_CHECK;
         end
         STATE_SETTLEMENT_CHECK: begin
-            if (settlement_check_step == 4) begin
+            if (current_piece_read_index == 4) begin
                 if (field_cell_read_value != 'b000) begin
                     state <= STATE_SETTLED;
                 end else begin
                     state <= STATE_RENDER;
                 end
             end else begin
-                settlement_check_step <= settlement_check_step + 1;
+                current_piece_read_index <= current_piece_read_index + 1;
 
                 field_x <= current_piece_read_cell_x;
                 field_y <= current_piece_read_cell_y;
@@ -158,33 +172,35 @@ always @(posedge clk) begin
 
             are_timer <= are_by_piece_position(current_piece_center_y);
 
-            // TODO:
-            // - If soft dropping update the score with soft drop score 
-            //        + reset soft drop score(unconditionally) + disable soft dropping
+            if (soft_dropping) begin
+                commit_soft_drop_score <= 1;
+            end
+            soft_dropping <= 0;
 
             current_piece_read_enable <= 1;
-            // TODO: Rename as it's used in 2 places.
-            settlement_check_step <= 0;
+            current_piece_read_index <= 0;
 
             state <= STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD;
         end
         STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
+            commit_soft_drop_score <= 0;
+
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
-            settlement_check_step <= settlement_check_step + 1;
+            current_piece_read_index <= current_piece_read_index + 1;
 
             state <= STATE_WRITE_PIECE_TO_FIELD;
         end
         STATE_WRITE_PIECE_TO_FIELD: begin
-            if (settlement_check_step == 4) begin
+            if (current_piece_read_index == 4) begin
                 field_write_enable <= 0;
                 current_piece_read_enable <= 0;
                 start_burn <= 1;
 
                 state <= STATE_BURNING;
             end else begin
-                settlement_check_step <= settlement_check_step + 1;
+                current_piece_read_index <= current_piece_read_index + 1;
 
                 field_x <= current_piece_read_cell_x;
                 field_y <= current_piece_read_cell_y;
@@ -214,7 +230,8 @@ always @(posedge clk) begin
         end
         STATE_PADDING: begin
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
-                current_frame_duration <= 0;       
+                current_frame_duration <= 0;    
+                state <= STATE_PROCESSING_INPUT;   
             end
         end
     endcase
