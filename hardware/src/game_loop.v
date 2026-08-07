@@ -1,36 +1,63 @@
 module game_loop(
     input wire clk,
 
+    // A current level.
     input wire[4:0] current_level,
 
+    // Move the current piece.
     output reg[1:0] piece_movement = 'b00,
 
+    // Enable read for the current piece.
+    //
+    // When it's enabled, piece cell coordinates will appear on `current_piece_read_cell_x` and 
+    // `current_piece_read_cell_y` when `current_piece_read_index` is set to the corresponding cell index.
     output reg current_piece_read_enable = 0,
+    // An index of the current piece cell that's being read.
     output wire[1:0] current_piece_read_index,
-
+    // X coordinate of the current piece cell that's being read.
     input wire[3:0] current_piece_read_cell_x,
+    // Y coordinate of the current piece cell that's being read.
     input wire[4:0] current_piece_read_cell_y,
 
+    // Y coordinate of the current piece center.
     input wire[4:0] current_piece_center_y,
 
+    // A type of the current piece.
     input wire[2:0] current_piece_type,
 
+    // X coordinate of the field cell, used for both read and write operations.
     output reg[3:0] field_x,
+    // Y coordinate of the field cell, used for both read and write operations.
     output reg[4:0] field_y,
 
+    // Request to read the field cell at coordinates (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_write_enable`.
     output reg field_read_enable = 0,
+    // Result of the field read operation initiated by asserting `field_read_enable`.
     input wire[2:0] field_cell_read_value,
 
+    // Request to write the value `field_cell_write_value` to the field cell at coordinates 
+    // (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_read_enable`.
     output reg field_write_enable = 0,
+    // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
+    // `field_write_enable` is asserted.
     output wire[2:0] field_cell_write_value,
 
+    // Start processing the burn.
     output reg start_burn = 0,
+    // Signalizes that the burn has completed.
     input wire burn_done,
 
+    // Start processing the lose.
     output reg start_lose = 0,
+    // Signalizes that the lose has completed.
     input wire lose_done,
 
-    output reg generate_new_piece = 0,
+    // Randomly generate the new piece.
+    output reg generate_new_piece = 0
 );
 
 localparam STATE_INIT = 'b0000;
@@ -69,10 +96,10 @@ always @(posedge clk) begin
 
     case (state)
         STATE_INIT: begin
-            // Initialize piece, field and so on.
+            // TODO: Initialize piece, field and so on.
         end
         STATE_PROCESSING_INPUT: begin
-            // TODO
+            // TODO: Implement.
 
             state <= STATE_ARE;
         end
