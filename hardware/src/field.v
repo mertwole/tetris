@@ -12,11 +12,18 @@ module field (
     input wire write_enable,
     input wire[3:0] din,
 
-    output wire[3:0] dout
+    output wire[3:0] dout,
+
+    input wire[3:0] rendering_x,
+    input wire[4:0] rendering_y,
+
+    output wire[3:0] rendering_dout
 );
 
 wire address = {y - 3, x - 3};
 wire address_valid = y >= 3 && y <= 22 && x >= 3 && x <= 12;
+
+wire rendering_address = {y - 3, x - 3};
 
 wire dout_raw;
 assign dout = address_valid ? dout_raw : 0;
@@ -29,7 +36,13 @@ field_state field_state_inst (
     .clka(clk),
     .dina(din),
     .douta(dout_raw),
-    .wea(wea)
+    .wea(wea),
+
+    .addrb(rendering_address),
+    .clkb(clk),
+    .dinb(0),
+    .doutb(rendering_dout),
+    .web(0)
 );
 
 endmodule
