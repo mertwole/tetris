@@ -23,7 +23,7 @@ module field (
 wire address = {y - 3, x - 3};
 wire address_valid = y >= 3 && y <= 22 && x >= 3 && x <= 12;
 
-wire rendering_address = (y - 3, x - 3);
+wire rendering_address = {y - 3, x - 3};
 
 wire dout_raw;
 assign dout = address_valid ? dout_raw : 0;

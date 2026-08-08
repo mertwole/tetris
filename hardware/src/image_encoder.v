@@ -2,9 +2,10 @@ module image_encoder (
     input wire clk,
     input wire reset,
 
-    // output reg  [11:0] pixel_read_request_x,
-    // output reg  [11:0] pixel_read_request_y,
-    // input  wire [23:0] read_pixel_data,
+    output wire[3:0] field_x_out,
+    output wire[4:0] field_y_out,
+
+    input wire[3:0] field_cell_value,
 
     output reg vsync,
     output reg hsync,
@@ -14,8 +15,14 @@ module image_encoder (
     output wire [7:0] pixel_b,
     output reg pixel_valid
 );
-  parameter X_RESOLUTION_DIVISION = 4;
-  parameter Y_RESOLUTION_DIVISION = 4;
+  localparam FIELD_CELL_SIZE = 32;
+
+  reg[7:0] field_x = 3;
+  reg[7:0] field_y = 3;
+
+  wire coords_valid = field_x >= 3 && field_x <= 12 && field_y >= 3 && field_y <= 22;
+  assign field_x_out = coords_valid ? field_x : 3;
+  assign field_y_out = coords_valid ? field_y : 3;
 
   parameter H_TOTAL = 1650 - 1;
   parameter H_SYNC = 40 - 1;
@@ -33,14 +40,15 @@ module image_encoder (
   reg [12:0] x;
   reg [12:0] y;
 
-  reg [11:0] pixel_read_request_x;
-  reg [11:0] pixel_read_request_y;
-
   reg [23:0] pixel;
   assign {pixel_b, pixel_g, pixel_r} = pixel;
 
   always @(posedge clk) begin
-    pixel <= {x, y};
+    if (coords_valid) begin
+      pixel <= field_cell_color(field_cell_value);
+    end else begin
+      pixel <= 'h000000;
+    end
   end
 
   always @(posedge clk) begin
@@ -89,40 +97,55 @@ module image_encoder (
     end
   end
 
-  integer read_request_x_divisor = 0;
-  integer read_request_y_divisor = 0;
+  integer field_x_divisor = 0;
+  integer field_y_divisor = 0;
 
   always @(posedge clk) begin
     if (reset == 1) begin
-      pixel_read_request_x   <= 0;
-      pixel_read_request_y   <= 0;
+      field_x <= 3;
+      field_y <= 3;
 
-      read_request_x_divisor <= 0;
-      read_request_y_divisor <= 0;
+      field_x_divisor <= 0;
+      field_y_divisor <= 0;
     end else if (x == H_START - 3) begin
-      pixel_read_request_x   <= 0;
-      read_request_x_divisor <= 0;
+      field_x <= 0;
+      field_x_divisor <= 0;
 
       if (y == V_START) begin
-        pixel_read_request_y   <= 0;
-        read_request_y_divisor <= 0;
+        field_y <= 0;
+        field_y_divisor <= 0;
       end else if (y > V_START && y < V_END) begin
-        if (read_request_y_divisor == Y_RESOLUTION_DIVISION - 1) begin
-          read_request_y_divisor <= 0;
+        if (field_y_divisor == FIELD_CELL_SIZE - 1) begin
+          field_y_divisor <= 0;
 
-          pixel_read_request_y   <= pixel_read_request_y + 1;
+          field_y <= field_y + 1;
         end else begin
-          read_request_y_divisor <= read_request_y_divisor + 1;
+          field_y_divisor <= field_y_divisor + 1;
         end
       end
     end else if (x > H_START - 3 && x < H_END - 3) begin
-      if (read_request_x_divisor == X_RESOLUTION_DIVISION - 1) begin
-        read_request_x_divisor <= 0;
+      if (field_x_divisor == FIELD_CELL_SIZE - 1) begin
+        field_x_divisor <= 0;
 
-        pixel_read_request_x   <= pixel_read_request_x + 1;
+        field_x <= field_x + 1;
       end else begin
-        read_request_x_divisor <= read_request_x_divisor + 1;
+        field_x_divisor <= field_x_divisor + 1;
       end
     end
   end
+
+  function[23:0] field_cell_color(input [2:0] cell_value);
+    begin
+      case(cell_value) 
+        'b000: field_cell_color = 'h101010;
+        'b001: field_cell_color = 'hFF0000;
+        'b010: field_cell_color = 'h00FF00;
+        'b011: field_cell_color = 'h0000FF;
+        'b100: field_cell_color = 'hFFFF00;
+        'b101: field_cell_color = 'hFF00FF;
+        'b110: field_cell_color = 'h00FFFF;
+        'b111: field_cell_color = 'hFFFFFF;
+      endcase
+    end
+  endfunction
 endmodule
