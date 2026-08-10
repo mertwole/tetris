@@ -54,6 +54,28 @@ module main (
   input wire button_down,
   input wire button_left
 );
+  wire rst;
+  wire clk1x;
+  wire clk5x;
+  
+  wire clock_locked;
+  wire clock_divider_locked;
+
+  assign rst = ~(clock_locked || clock_divider_locked);
+
+  clock clock_inst (
+    .clk_out1(clk5x),
+    .resetn  (rst_n),
+    .locked  (clock_locked),
+    .clk_in1 (clk)
+  );
+
+  clock_divider clock_divider_inst (
+    .clk_out1(clk1x),
+    .resetn  (rst_n),
+    .locked  (clock_divider_locked),
+    .clk_in1 (clk5x)
+  );
 
   wire [10:0] digit_bus = {
     digit_0, 
@@ -96,28 +118,59 @@ module main (
     game_state_2,
     game_state_3
   };
-  
-  wire rst;
-  wire clk1x;
-  wire clk5x;
-  
-  wire clock_locked;
-  wire clock_divider_locked;
 
-  assign rst = ~(clock_locked || clock_divider_locked);
+  wire[1:0] next_piece_read_index;
+  wire[1:0] next_piece_cell_x;
+  wire next_piece_cell_y;
+  wire[2:0] next_piece_type;
 
-  clock clock_inst (
-    .clk_out1(clk5x),
-    .resetn  (rst_n),
-    .locked  (clock_locked),
-    .clk_in1 (clk)
+  wire[10:0] digit_bus_inv;
+  wire[6:0] segment_bus_inv;
+
+  assign digit_bus = ~digit_bus_inv;
+  assign segment_bus = ~segment_bus_inv;
+
+  wire button_start_pressed;
+
+  io io_inst(
+    .clk(clk1x),
+
+    .digits(digit_bus_inv),
+    .segments(segment_bus_inv),
+    .next_piece_leds(next_piece_bus),
+    .game_state_leds(game_state_bus),
+
+    .button_start(button_start),
+    .button_rotate_cw(button_rotate_cw),
+    .button_rotate_ccw(button_rotate_ccw),
+    .button_right(button_right),
+    .button_down(button_down),
+    .button_left(button_left),
+
+    .button_start_pressed(button_start_pressed),
+    //.button_rotate_cw_pressed(),
+    //.button_rotate_ccw_pressed(),
+    //.button_right_pressed(),
+    //.button_down_pressed(),
+    //.button_left_pressed(),
+    
+    .next_piece_read_index(next_piece_read_index),
+    .next_piece_cell_x(next_piece_cell_x),
+    .next_piece_cell_y(next_piece_cell_y),
+    .next_piece_type(next_piece_type),
+
+    .game_state('b01)
   );
 
-  clock_divider clock_divider_inst (
-    .clk_out1(clk1x),
-    .resetn  (rst_n),
-    .locked  (clock_divider_locked),
-    .clk_in1 (clk5x)
+  next_piece next_piece_inst(
+    .clk(clk1x),
+
+    .gen(button_start_pressed),
+
+    .read_index(next_piece_read_index),
+    .cell_x(next_piece_cell_x),
+    .cell_y(next_piece_cell_y),
+    .type(next_piece_type)
   );
 
   field field_inst (
