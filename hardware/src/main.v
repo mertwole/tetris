@@ -137,7 +137,9 @@ module main (
 
     .digits(digit_bus_inv),
     .segments(segment_bus_inv),
+
     .next_piece_leds(next_piece_bus),
+    
     .game_state_leds(game_state_bus),
 
     .button_start(button_start),
@@ -146,6 +148,10 @@ module main (
     .button_right(button_right),
     .button_down(button_down),
     .button_left(button_left),
+
+    .score(12345),
+    .lines_burned(123),
+    .level(31),
 
     .button_start_pressed(button_start_pressed),
     //.button_rotate_cw_pressed(),
