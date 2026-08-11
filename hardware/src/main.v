@@ -176,17 +176,6 @@ module main (
     .game_state('b01)
   );
 
-  next_piece next_piece_inst(
-    .clk(clk1x),
-
-    .gen(generate_next_piece),
-
-    .read_index(next_piece_read_index),
-    .cell_x(next_piece_cell_x),
-    .cell_y(next_piece_cell_y),
-    .type(next_piece_type)
-  );
-
   integer frame_clock = 0;
 
   reg prev_frame_right_pressed = 0;
@@ -240,6 +229,17 @@ module main (
     end
   end
 
+  next_piece next_piece_inst(
+    .clk(clk1x),
+
+    .gen(generate_next_piece),
+
+    .read_index(next_piece_read_index),
+    .cell_x(next_piece_cell_x),
+    .cell_y(next_piece_cell_y),
+    .type(next_piece_type)
+  );
+
   scores scores_inst(
     .clk(clk1x),
     .line_burned(line_burned), // rotate_cw
@@ -251,13 +251,44 @@ module main (
     .lines_burned_bcd(lines_burned_bcd)
   );
 
+  wire[3:0] field_rendering_x;
+  wire[4:0] field_rendering_y;
+  wire[2:0] field_rendering_data;
+
+  reg[3:0] field_x = 5;
+  reg[4:0] field_y = 5;
+  reg field_write_enable = 0;
+  reg[2:0] field_din = 3'b000;
+
+  integer field_fill_counter = 0;
+
+  always @(posedge clk1x) begin
+    if (!rst) begin
+      if (field_fill_counter != 10) begin
+        field_fill_counter <= field_fill_counter + 1;
+
+        field_x <= field_fill_counter + 3;
+        field_y <= field_fill_counter + 3;
+        field_din <= field_fill_counter;
+        field_write_enable <= 1;
+      end else begin
+        field_write_enable <= 0;
+      end
+    end
+  end
+
   field field_inst (
-    .clk(clk1x)
-    //.x(),
-    //.y(),
-    //.write_enable(),
-    //.din(),
-    //.dout()
+    .clk(clk1x),
+
+    .x_coord(field_x),
+    .y_coord(field_y),
+    .write_enable(field_write_enable),
+    .din(field_din),
+    //.dout(),
+
+    .rendering_x(field_rendering_x),
+    .rendering_y(field_rendering_y),
+    .rendering_dout(field_rendering_data)
   );
 
   wire [7:0] pixel_r;
@@ -270,6 +301,11 @@ module main (
   image_encoder image_encoder_inst (
     .clk(clk1x),
     .reset(rst),
+
+    .field_x_out(field_rendering_x),
+    .field_y_out(field_rendering_y),
+    .field_cell_value(field_rendering_data),
+
     .vsync(vsync),
     .hsync(hsync),
     .pixel_r(pixel_r),
