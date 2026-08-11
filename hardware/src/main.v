@@ -149,9 +149,8 @@ module main (
     .button_down(button_down),
     .button_left(button_left),
 
-    .score(12345),
-    .lines_burned(123),
-    .level(31),
+    .score(912345),
+    .lines_burned_bcd(12'b1001_0110_0101),
 
     .button_start_pressed(button_start_pressed),
     //.button_rotate_cw_pressed(),

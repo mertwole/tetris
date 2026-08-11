@@ -15,9 +15,8 @@ module io(
     input wire button_down,
     input wire button_left,
 
-    input wire[19:0] score, // + 28
-    input wire[8:0] lines_burned, // + 12
-    input wire[4:0] level, // + 8
+    input wire[19:0] score,
+    input wire[11:0] lines_burned_bcd,
 
     output wire[1:0] next_piece_read_index,
     input wire[1:0] next_piece_cell_x,
@@ -46,42 +45,75 @@ always @(posedge clk) begin
     end
 end
 
-reg[12:0] level_scratch_space = 0;
-wire[7:0] level_bcd = level_scratch_space[12:5];
-reg[20:0] level_dd_step = 0;
+reg[43:0] score_scratch_space = 0;
+wire[23:0] score_bcd = score_scratch_space[43:20];
+reg[5:0] score_dd_step = 0;
 
-wire[3:0] level_scratch_space_next_0 = level_scratch_space[12:9] >= 5 ? level_scratch_space[12:9] + 3 : level_scratch_space[12:9];
-wire[3:0] level_scratch_space_next_1 = level_scratch_space[8:5] >= 5 ? level_scratch_space[8:5] + 3 : level_scratch_space[8:5];
-wire[12:0] level_scratch_space_next = {
-    level_scratch_space_next_0, 
-    level_scratch_space_next_1, 
-    level_scratch_space[4:0]
+wire[3:0] score_scratch_space_next_0 = score_scratch_space[43:40] >= 5 ? score_scratch_space[43:40] + 3 : score_scratch_space[43:40];
+wire[3:0] score_scratch_space_next_1 = score_scratch_space[39:36] >= 5 ? score_scratch_space[39:36] + 3 : score_scratch_space[39:36];
+wire[3:0] score_scratch_space_next_2 = score_scratch_space[35:32] >= 5 ? score_scratch_space[35:32] + 3 : score_scratch_space[35:32];
+wire[3:0] score_scratch_space_next_3 = score_scratch_space[31:28] >= 5 ? score_scratch_space[31:28] + 3 : score_scratch_space[31:28];
+wire[3:0] score_scratch_space_next_4 = score_scratch_space[27:24] >= 5 ? score_scratch_space[27:24] + 3 : score_scratch_space[27:24];
+wire[3:0] score_scratch_space_next_5 = score_scratch_space[23:20] >= 5 ? score_scratch_space[23:20] + 3 : score_scratch_space[23:20];
+
+wire[43:0] score_scratch_space_next = {
+    score_scratch_space_next_0, 
+    score_scratch_space_next_1, 
+    score_scratch_space_next_2, 
+    score_scratch_space_next_3, 
+    score_scratch_space_next_4, 
+    score_scratch_space_next_5, 
+    score_scratch_space[19:0]
 };
 
 always @(posedge clk) begin
-    if(level_dd_step == 10) begin
-        level_dd_step <= 0;
+    if (score_dd_step == 40) begin
+        score_dd_step <= 0;
 
         case (digits)
+            'b10000000000: begin
+                segments <= bcd_to_digit(score_scratch_space[43:40]);
+            end
+            'b01000000000: begin
+                segments <= bcd_to_digit(score_scratch_space[39:36]);
+            end
+            'b00100000000: begin
+                segments <= bcd_to_digit(score_scratch_space[35:32]);
+            end
+            'b00010000000: begin
+                segments <= bcd_to_digit(score_scratch_space[31:28]);
+            end
+            'b00001000000: begin
+                segments <= bcd_to_digit(score_scratch_space[27:24]);
+            end
+            'b00000100000: begin
+                segments <= bcd_to_digit(score_scratch_space[23:20]);
+            end
+            'b00000010000: begin
+                segments <= bcd_to_digit(lines_burned_bcd[11:8]);
+            end
+            'b00000001000: begin
+                segments <= bcd_to_digit(lines_burned_bcd[7:4]);
+            end
+            'b00000000100: begin
+                segments <= bcd_to_digit(lines_burned_bcd[3:0]);
+            end
             'b00000000010: begin
-                segments <= bcd_to_digit(level_bcd[7:4]);
+                segments <= bcd_to_digit(lines_burned_bcd[11:8]);
             end
             'b00000000001: begin
-                segments <= bcd_to_digit(level_bcd[3:0]);
-            end
-            default: begin
-                segments <= 0;
+                segments <= bcd_to_digit(lines_burned_bcd[7:4]);
             end
         endcase
 
-        level_scratch_space <= {8'b0000_0000, level};
+        score_scratch_space <= {24'd0, score};
     end else begin
-        level_dd_step <= level_dd_step + 1;
+        score_dd_step <= score_dd_step + 1;
 
-        if (level_dd_step[0] == 0) begin
-            level_scratch_space <= level_scratch_space_next;
+        if (score_dd_step[0] == 0) begin
+            score_scratch_space <= score_scratch_space_next;
         end else begin
-            level_scratch_space <= level_scratch_space << 1;
+            score_scratch_space <= score_scratch_space << 1;
         end
     end
 end
