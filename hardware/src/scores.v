@@ -31,29 +31,31 @@ module scores(
     output reg[19:0] score,
 
     // Total amound of burned lines in the current game.
-    output reg[8:0] lines_burned,
-
-    // Current level.
-    output reg[4:0] level
+    //
+    // Encoded as 3-digit BCD.
+    output reg[11:0] lines_burned_bcd
 );
 
 reg[2:0] lines_burned_from_last_time = 0;
-reg[3:0] lines_burned_mod_10 = 0;
 reg[4:0] soft_drop_score = 0;
+
+wire[4:0] level = lines_burned_bcd[11:8] * 10 + lines_burned_bcd[7:4];
+
+wire[3:0] lines_burned_digit_0_inc = lines_burned_bcd[11:8] + 1;
+wire[3:0] lines_burned_digit_1_inc = lines_burned_bcd[7:4] + 1;
+wire[3:0] lines_burned_digit_2_inc = lines_burned_bcd[3:0] + 1;
 
 always @(posedge clk) begin
     if (line_burned) begin
         soft_drop_score <= 0;
 
         lines_burned_from_last_time <= lines_burned_from_last_time + 1;
-        lines_burned <= lines_burned + 1;
-        
-        if (lines_burned_mod_10 == 9) begin
-            lines_burned_mod_10 <= 0;
-            level <= level + 1;
-        end else begin
-            lines_burned_mod_10 <= lines_burned_mod_10 + 1;
-        end
+
+        case({lines_burned_bcd[7:4] == 9, lines_burned_bcd[3:0] == 9})
+            'b00, 'b10: lines_burned_bcd <= {lines_burned_bcd[11:4], lines_burned_digit_2_inc};
+            'b01:       lines_burned_bcd <= {lines_burned_bcd[11:8], lines_burned_digit_1_inc, 4'b0000};
+            'b11:       lines_burned_bcd <= {lines_burned_digit_0_inc, 4'b0000, 4'b0000};
+        endcase
     end else if (commit_burned_lines) begin
         soft_drop_score <= 0;
 

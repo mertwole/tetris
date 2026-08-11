@@ -132,6 +132,11 @@ module main (
 
   wire button_start_pressed;
 
+  wire[19:0] score;
+  wire[11:0] lines_burned_bcd;
+
+  wire button_right_pressed;
+
   io io_inst(
     .clk(clk1x),
 
@@ -149,13 +154,13 @@ module main (
     .button_down(button_down),
     .button_left(button_left),
 
-    .score(912345),
-    .lines_burned_bcd(12'b1001_0110_0101),
+    .score(score),
+    .lines_burned_bcd(lines_burned_bcd),
 
     .button_start_pressed(button_start_pressed),
     //.button_rotate_cw_pressed(),
     //.button_rotate_ccw_pressed(),
-    //.button_right_pressed(),
+    .button_right_pressed(button_right_pressed),
     //.button_down_pressed(),
     //.button_left_pressed(),
     
@@ -176,6 +181,39 @@ module main (
     .cell_x(next_piece_cell_x),
     .cell_y(next_piece_cell_y),
     .type(next_piece_type)
+  );
+
+  integer frame_clock = 0;
+  reg prev_frame_right_pressed = 0;
+  reg line_burned = 0;
+
+  always @(posedge clk1x) begin
+    if (frame_clock == 10_000) begin
+      frame_clock <= 0;
+
+      if (!prev_frame_right_pressed && button_right_pressed) begin
+        line_burned <= 1;
+      end else begin
+        line_burned <= 0;
+      end
+
+      prev_frame_right_pressed <= button_right_pressed;
+    end else begin 
+      frame_clock <= frame_clock + 1;
+
+      line_burned <= 0;
+    end
+  end
+
+  scores scores_inst(
+    .clk(clk1x),
+    .line_burned(line_burned),
+    //.commit_burned_lines(),
+    //.soft_dropping(),
+    //.reset_soft_drop_score(),
+    //.commit_soft_drop_score(),
+    .score(score),
+    .lines_burned_bcd(lines_burned_bcd)
   );
 
   field field_inst (
