@@ -73,7 +73,7 @@ always @(posedge clk) begin
         soft_drop_score <= 0;
     end else if (commit_soft_drop_score) begin
         soft_drop_score <= 0;
-        score <= score + commit_soft_drop_score;
+        score <= score + soft_drop_score;
     end
 end
 

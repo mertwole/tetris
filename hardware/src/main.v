@@ -136,6 +136,10 @@ module main (
   wire[11:0] lines_burned_bcd;
 
   wire button_right_pressed;
+  wire button_down_pressed;
+  wire button_left_pressed;
+  wire button_rotate_cw_pressed;
+  wire button_rotate_ccw_pressed;
 
   io io_inst(
     .clk(clk1x),
@@ -158,11 +162,11 @@ module main (
     .lines_burned_bcd(lines_burned_bcd),
 
     .button_start_pressed(button_start_pressed),
-    //.button_rotate_cw_pressed(),
-    //.button_rotate_ccw_pressed(),
+    .button_rotate_cw_pressed(button_rotate_cw_pressed),
+    .button_rotate_ccw_pressed(button_rotate_ccw_pressed),
     .button_right_pressed(button_right_pressed),
-    //.button_down_pressed(),
-    //.button_left_pressed(),
+    .button_down_pressed(button_down_pressed),
+    .button_left_pressed(button_left_pressed),
     
     .next_piece_read_index(next_piece_read_index),
     .next_piece_cell_x(next_piece_cell_x),
@@ -175,7 +179,7 @@ module main (
   next_piece next_piece_inst(
     .clk(clk1x),
 
-    .gen(button_start_pressed),
+    .gen(generate_next_piece),
 
     .read_index(next_piece_read_index),
     .cell_x(next_piece_cell_x),
@@ -184,34 +188,65 @@ module main (
   );
 
   integer frame_clock = 0;
+
   reg prev_frame_right_pressed = 0;
+  reg soft_dropping = 0;
+
+  reg prev_frame_down_pressed = 0;
+  reg reset_soft_drop_score = 0;
+
+  reg prev_frame_left_pressed = 0;
+  reg commit_soft_drop_score = 0;
+
+  reg prev_frame_rotate_cw_pressed = 0;
   reg line_burned = 0;
 
+  reg prev_frame_rotate_ccw_pressed = 0;
+  reg commit_burned_lines = 0;
+
+  reg prev_frame_start_pressed = 0;
+  reg generate_next_piece = 0;
+
   always @(posedge clk1x) begin
-    if (frame_clock == 10_000) begin
+    if (frame_clock == 1_000_000) begin
       frame_clock <= 0;
 
-      if (!prev_frame_right_pressed && button_right_pressed) begin
-        line_burned <= 1;
-      end else begin
-        line_burned <= 0;
-      end
-
       prev_frame_right_pressed <= button_right_pressed;
+      soft_dropping <= !prev_frame_right_pressed && button_right_pressed;
+
+      prev_frame_down_pressed <= button_down_pressed;
+      reset_soft_drop_score <= !prev_frame_down_pressed && button_down_pressed;
+
+      prev_frame_left_pressed <= button_left_pressed;
+      commit_soft_drop_score <= !prev_frame_left_pressed && button_left_pressed;
+
+      prev_frame_rotate_cw_pressed <= button_rotate_cw_pressed;
+      line_burned <= !prev_frame_rotate_cw_pressed && button_rotate_cw_pressed;
+
+      prev_frame_rotate_ccw_pressed <= button_rotate_ccw_pressed;
+      commit_burned_lines <= !prev_frame_rotate_ccw_pressed && button_rotate_ccw_pressed;
+
+      prev_frame_start_pressed <= button_start_pressed;
+      generate_next_piece <= !prev_frame_start_pressed && button_start_pressed;
     end else begin 
       frame_clock <= frame_clock + 1;
 
+      soft_dropping <= 0;
+      reset_soft_drop_score <= 0;
+      commit_soft_drop_score <= 0;
       line_burned <= 0;
+      commit_burned_lines <= 0;
+      generate_next_piece <= 0;
     end
   end
 
   scores scores_inst(
     .clk(clk1x),
-    .line_burned(line_burned),
-    //.commit_burned_lines(),
-    //.soft_dropping(),
-    //.reset_soft_drop_score(),
-    //.commit_soft_drop_score(),
+    .line_burned(line_burned), // rotate_cw
+    .commit_burned_lines(commit_burned_lines), // rotate_ccw
+    .soft_dropping(soft_dropping), // right
+    .reset_soft_drop_score(reset_soft_drop_score), // down
+    .commit_soft_drop_score(commit_soft_drop_score), // left
     .score(score),
     .lines_burned_bcd(lines_burned_bcd)
   );
