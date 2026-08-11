@@ -13,23 +13,47 @@ module main (
   output wire hdmi_tx_chn_b_n,
   output wire hdmi_tx_chn_b_p,
 
-  output wire debug_bus_7,
-  output wire debug_bus_6,
-  output wire debug_bus_5,
-  output wire debug_bus_4,
-  output wire debug_bus_3,
-  output wire debug_bus_2,
-  output wire debug_bus_1,
-  output wire debug_bus_0,
+  output wire digit_0,
+  output wire digit_1,
+  output wire digit_2,
+  output wire digit_3,
+  output wire digit_4,
+  output wire digit_5,
+  output wire digit_6,
+  output wire digit_7,
+  output wire digit_8,
+  output wire digit_9,
+  output wire digit_10,
 
-  output wire debug_0,
-  output wire debug_1,
-  output wire debug_2,
-  output wire debug_3,
-  output wire debug_4
+  output wire segment_0,
+  output wire segment_1,
+  output wire segment_2,
+  output wire segment_3,
+  output wire segment_4,
+  output wire segment_5,
+  output wire segment_6,
+
+  output wire next_piece_led_0,
+  output wire next_piece_led_1,
+  output wire next_piece_led_2,
+  output wire next_piece_led_3,
+  output wire next_piece_led_4,
+  output wire next_piece_led_5,
+  output wire next_piece_led_6,
+  output wire next_piece_led_7,
+
+  output wire game_state_0,
+  output wire game_state_1,
+  output wire game_state_2,
+  output wire game_state_3,
+
+  input wire button_start,
+  input wire button_rotate_cw,
+  input wire button_rotate_ccw,
+  input wire button_right,
+  input wire button_down,
+  input wire button_left
 );
-  wire [7:0] debug_bus = {debug_bus_7, debug_bus_6, debug_bus_5, debug_bus_4, debug_bus_3, debug_bus_2, debug_bus_1, debug_bus_0};
-
   wire rst;
   wire clk1x;
   wire clk5x;
@@ -51,6 +75,107 @@ module main (
     .resetn  (rst_n),
     .locked  (clock_divider_locked),
     .clk_in1 (clk5x)
+  );
+
+  wire [10:0] digit_bus = {
+    digit_0, 
+    digit_1, 
+    digit_2, 
+    digit_3, 
+    digit_4, 
+    digit_5, 
+    digit_6, 
+    digit_7, 
+    digit_8, 
+    digit_9, 
+    digit_10
+  };
+
+  wire [6:0] segment_bus = {
+    segment_0, 
+    segment_1, 
+    segment_2, 
+    segment_3, 
+    segment_4, 
+    segment_5, 
+    segment_6
+  };
+
+  wire [7:0] next_piece_bus = {
+    next_piece_led_0,
+    next_piece_led_1,
+    next_piece_led_2,
+    next_piece_led_3,
+    next_piece_led_4,
+    next_piece_led_5,
+    next_piece_led_6,
+    next_piece_led_7
+  };
+
+  wire [3:0] game_state_bus = {
+    game_state_0,
+    game_state_1,
+    game_state_2,
+    game_state_3
+  };
+
+  wire[1:0] next_piece_read_index;
+  wire[1:0] next_piece_cell_x;
+  wire next_piece_cell_y;
+  wire[2:0] next_piece_type;
+
+  wire[10:0] digit_bus_inv;
+  wire[6:0] segment_bus_inv;
+
+  assign digit_bus = ~digit_bus_inv;
+  assign segment_bus = ~segment_bus_inv;
+
+  wire button_start_pressed;
+
+  io io_inst(
+    .clk(clk1x),
+
+    .digits(digit_bus_inv),
+    .segments(segment_bus_inv),
+
+    .next_piece_leds(next_piece_bus),
+    
+    .game_state_leds(game_state_bus),
+
+    .button_start(button_start),
+    .button_rotate_cw(button_rotate_cw),
+    .button_rotate_ccw(button_rotate_ccw),
+    .button_right(button_right),
+    .button_down(button_down),
+    .button_left(button_left),
+
+    .score(912345),
+    .lines_burned_bcd(12'b1001_0110_0101),
+
+    .button_start_pressed(button_start_pressed),
+    //.button_rotate_cw_pressed(),
+    //.button_rotate_ccw_pressed(),
+    //.button_right_pressed(),
+    //.button_down_pressed(),
+    //.button_left_pressed(),
+    
+    .next_piece_read_index(next_piece_read_index),
+    .next_piece_cell_x(next_piece_cell_x),
+    .next_piece_cell_y(next_piece_cell_y),
+    .next_piece_type(next_piece_type),
+
+    .game_state('b01)
+  );
+
+  next_piece next_piece_inst(
+    .clk(clk1x),
+
+    .gen(button_start_pressed),
+
+    .read_index(next_piece_read_index),
+    .cell_x(next_piece_cell_x),
+    .cell_y(next_piece_cell_y),
+    .type(next_piece_type)
   );
 
   field field_inst (
