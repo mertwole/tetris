@@ -5,7 +5,7 @@ module image_encoder (
     output wire[3:0] field_x_out,
     output wire[4:0] field_y_out,
 
-    input wire[3:0] field_cell_value,
+    input wire[2:0] field_cell_value,
 
     output reg vsync,
     output reg hsync,
@@ -15,14 +15,14 @@ module image_encoder (
     output wire [7:0] pixel_b,
     output reg pixel_valid
 );
-  localparam FIELD_CELL_SIZE = 32;
+  localparam FIELD_CELL_SIZE = 20;
 
   reg[7:0] field_x = 3;
   reg[7:0] field_y = 3;
 
   wire coords_valid = field_x >= 3 && field_x <= 12 && field_y >= 3 && field_y <= 22;
   assign field_x_out = coords_valid ? field_x : 3;
-  assign field_y_out = coords_valid ? field_y : 3;
+  assign field_y_out = coords_valid ? 25 - field_y : 3;
 
   parameter H_TOTAL = 1650 - 1;
   parameter H_SYNC = 40 - 1;
@@ -37,8 +37,8 @@ module image_encoder (
   parameter SCREEN_X = 1280;
   parameter SCREEN_Y = 720;
 
-  reg [12:0] x;
-  reg [12:0] y;
+  reg [12:0] x_coord;
+  reg [12:0] y_coord;
 
   reg [23:0] pixel;
   assign {pixel_b, pixel_g, pixel_r} = pixel;
@@ -53,36 +53,36 @@ module image_encoder (
 
   always @(posedge clk) begin
     if (reset == 1) begin
-      x <= 0;
-    end else if (x == H_TOTAL) begin
-      x <= 0;
-    end else if (x != H_TOTAL) begin
-      x <= x + 1;
+      x_coord <= 0;
+    end else if (x_coord == H_TOTAL) begin
+      x_coord <= 0;
+    end else if (x_coord != H_TOTAL) begin
+      x_coord <= x_coord + 1;
     end
 
     if (reset == 1) begin
-      y <= 0;
-    end else if (y == V_TOTAL && x == H_TOTAL) begin
-      y <= 0;
-    end else if (x == H_TOTAL) begin
-      y <= y + 1;
+      y_coord <= 0;
+    end else if (y_coord == V_TOTAL && x_coord == H_TOTAL) begin
+      y_coord <= 0;
+    end else if (x_coord == H_TOTAL) begin
+      y_coord <= y_coord + 1;
     end
   end
 
   always @(posedge clk) begin
     if (reset == 1) begin
       hsync <= 1;
-    end else if (x == H_TOTAL) begin
+    end else if (x_coord == H_TOTAL) begin
       hsync <= 1;
-    end else if (x == H_SYNC) begin
+    end else if (x_coord == H_SYNC) begin
       hsync <= 0;
     end
 
     if (reset == 1) begin
       vsync <= 1;
-    end else if (y == V_TOTAL && x == H_TOTAL) begin
+    end else if (y_coord == V_TOTAL && x_coord == H_TOTAL) begin
       vsync <= 1;
-    end else if (y == V_SYNC && x == H_TOTAL) begin
+    end else if (y_coord == V_SYNC && x_coord == H_TOTAL) begin
       vsync <= 0;
     end
   end
@@ -90,7 +90,7 @@ module image_encoder (
   always @(posedge clk) begin
     if (reset == 1) begin
       pixel_valid <= 0;
-    end else if ((x >= H_START) && (x < H_END) && (y >= V_START) && (y < V_END)) begin
+    end else if ((x_coord >= H_START) && (x_coord < H_END) && (y_coord >= V_START) && (y_coord < V_END)) begin
       pixel_valid <= 1;
     end else begin
       pixel_valid <= 0;
@@ -102,19 +102,19 @@ module image_encoder (
 
   always @(posedge clk) begin
     if (reset == 1) begin
-      field_x <= 3;
-      field_y <= 3;
+      field_x <= 0;
+      field_y <= 0;
 
       field_x_divisor <= 0;
       field_y_divisor <= 0;
-    end else if (x == H_START - 3) begin
+    end else if (x_coord == H_START - 3) begin
       field_x <= 0;
       field_x_divisor <= 0;
 
-      if (y == V_START) begin
+      if (y_coord == V_START) begin
         field_y <= 0;
         field_y_divisor <= 0;
-      end else if (y > V_START && y < V_END) begin
+      end else if (y_coord > V_START && y_coord < V_END) begin
         if (field_y_divisor == FIELD_CELL_SIZE - 1) begin
           field_y_divisor <= 0;
 
@@ -123,7 +123,7 @@ module image_encoder (
           field_y_divisor <= field_y_divisor + 1;
         end
       end
-    end else if (x > H_START - 3 && x < H_END - 3) begin
+    end else if (x_coord > H_START - 3 && x_coord < H_END - 3) begin
       if (field_x_divisor == FIELD_CELL_SIZE - 1) begin
         field_x_divisor <= 0;
 

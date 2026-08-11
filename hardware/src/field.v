@@ -6,26 +6,30 @@
 module field (
     input wire clk,
 
-    input wire[3:0] x,
-    input wire[4:0] y,
+    input wire[3:0] x_coord,
+    input wire[4:0] y_coord,
 
     input wire write_enable,
-    input wire[3:0] din,
+    input wire[2:0] din,
 
-    output wire[3:0] dout,
+    output wire[2:0] dout,
 
     input wire[3:0] rendering_x,
     input wire[4:0] rendering_y,
 
-    output wire[3:0] rendering_dout
+    output wire[2:0] rendering_dout
 );
 
-wire address = {y - 3, x - 3};
-wire address_valid = y >= 3 && y <= 22 && x >= 3 && x <= 12;
+wire[4:0] address_y = y_coord - 3;
+wire[3:0] address_x = x_coord - 3;
+wire[8:0] address = {address_y, address_x};
+wire address_valid = y_coord >= 3 && y_coord <= 22 && x_coord >= 3 && x_coord <= 12;
 
-wire rendering_address = {y - 3, x - 3};
+wire[4:0] rendering_address_y = rendering_y - 3;
+wire[3:0] rendering_address_x = rendering_x - 3;
+wire[8:0] rendering_address = {rendering_address_y, rendering_address_x};
 
-wire dout_raw;
+wire[2:0] dout_raw;
 assign dout = address_valid ? dout_raw : 0;
 
 wire wea = write_enable & address_valid;
