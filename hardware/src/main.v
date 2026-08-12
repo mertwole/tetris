@@ -240,10 +240,13 @@ module main (
     .type(next_piece_type)
   );
 
+  wire line_burned;
+  wire commit_burned_lines;
+
   scores scores_inst(
     .clk(clk1x),
-    .line_burned(rotate_cw_just_pressed),
-    .commit_burned_lines(rotate_ccw_just_pressed),
+    .line_burned(line_burned),
+    .commit_burned_lines(commit_burned_lines),
     .soft_dropping(right_just_pressed),
     .reset_soft_drop_score(down_just_pressed),
     .commit_soft_drop_score(left_just_pressed),
@@ -288,7 +291,10 @@ module main (
     .field_cell_read_value(field_dout),
 
     .field_write_enable(field_write_enable),
-    .field_cell_write_value(field_din)
+    .field_cell_write_value(field_din),
+
+    .line_burned(line_burned),
+    .commit_burned_lines(commit_burned_lines)
   );
 
   wire [7:0] pixel_r;

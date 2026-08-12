@@ -25,7 +25,18 @@ module burn (
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.
-    output reg[2:0] field_cell_write_value = 0
+    output reg[2:0] field_cell_write_value = 0,
+
+    // Signalize that a single line was burned.
+    //
+    // Used to compute the burned lines amount by `scores`.
+    //
+    // Will be asserted for a single clock cycle.
+    output reg line_burned = 0,
+    // Signalize that all the burn operations are complete.
+    //
+    // Will be asserted for a single clock cycle.
+    output reg commit_burned_lines = 0
 );
 
 localparam STATE_IDLE = 'b000;
@@ -48,6 +59,8 @@ reg[2:0] currently_burning_y = 0;
 always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
+            commit_burned_lines <= 0;
+
             if (start) begin
                 field_x <= 3;
                 field_y <= 3;
@@ -123,10 +136,14 @@ always @(posedge clk) begin
             field_x <= 3;
             field_y <= lines_to_burn[amount_of_lines_to_burn - 1] + 1;
             state <= STATE_FALLING;
+
+            line_burned <= 1;
         end
         STATE_FALLING: begin // TODO: Play animation.
             if (field_read_enable && !field_write_enable) begin
                 field_y <= field_y - 1;
+
+                line_burned <= 0;
 
                 field_read_enable <= 0;
             end else if(!field_read_enable && !field_write_enable) begin
@@ -138,11 +155,15 @@ always @(posedge clk) begin
                     field_x <= 3;
                     if (field_y == 21) begin
                         if (amount_of_lines_to_burn == 1) begin
+                            commit_burned_lines <= 1;
+
                             state <= STATE_IDLE;
                         end else begin
                             // NOTE: `amount_of_lines_to_burn` counter is reused here.
                             amount_of_lines_to_burn <= amount_of_lines_to_burn - 1;
                             field_y <= lines_to_burn[amount_of_lines_to_burn - 2] + 1;
+
+                            line_burned <= 1;
 
                             field_read_enable <= 1;
                         end
