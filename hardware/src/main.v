@@ -179,60 +179,60 @@ module main (
   integer frame_clock = 0;
 
   reg prev_frame_right_pressed = 0;
-  reg soft_dropping = 0;
+  reg right_just_pressed = 0;
 
   reg prev_frame_down_pressed = 0;
-  reg reset_soft_drop_score = 0;
+  reg down_just_pressed = 0;
 
   reg prev_frame_left_pressed = 0;
-  reg commit_soft_drop_score = 0;
+  reg left_just_pressed = 0;
 
   reg prev_frame_rotate_cw_pressed = 0;
-  reg line_burned = 0;
+  reg rotate_cw_just_pressed = 0;
 
   reg prev_frame_rotate_ccw_pressed = 0;
-  reg commit_burned_lines = 0;
+  reg rotate_ccw_just_pressed = 0;
 
   reg prev_frame_start_pressed = 0;
-  reg generate_next_piece = 0;
+  reg start_just_pressed = 0;
 
   always @(posedge clk1x) begin
     if (frame_clock == 1_000_000) begin
       frame_clock <= 0;
 
       prev_frame_right_pressed <= button_right_pressed;
-      soft_dropping <= !prev_frame_right_pressed && button_right_pressed;
+      right_just_pressed <= !prev_frame_right_pressed && button_right_pressed;
 
       prev_frame_down_pressed <= button_down_pressed;
-      reset_soft_drop_score <= !prev_frame_down_pressed && button_down_pressed;
+      down_just_pressed <= !prev_frame_down_pressed && button_down_pressed;
 
       prev_frame_left_pressed <= button_left_pressed;
-      commit_soft_drop_score <= !prev_frame_left_pressed && button_left_pressed;
+      left_just_pressed <= !prev_frame_left_pressed && button_left_pressed;
 
       prev_frame_rotate_cw_pressed <= button_rotate_cw_pressed;
-      line_burned <= !prev_frame_rotate_cw_pressed && button_rotate_cw_pressed;
+      rotate_cw_just_pressed <= !prev_frame_rotate_cw_pressed && button_rotate_cw_pressed;
 
       prev_frame_rotate_ccw_pressed <= button_rotate_ccw_pressed;
-      commit_burned_lines <= !prev_frame_rotate_ccw_pressed && button_rotate_ccw_pressed;
+      rotate_ccw_just_pressed <= !prev_frame_rotate_ccw_pressed && button_rotate_ccw_pressed;
 
       prev_frame_start_pressed <= button_start_pressed;
-      generate_next_piece <= !prev_frame_start_pressed && button_start_pressed;
+      start_just_pressed <= !prev_frame_start_pressed && button_start_pressed;
     end else begin 
       frame_clock <= frame_clock + 1;
 
-      soft_dropping <= 0;
-      reset_soft_drop_score <= 0;
-      commit_soft_drop_score <= 0;
-      line_burned <= 0;
-      commit_burned_lines <= 0;
-      generate_next_piece <= 0;
+      right_just_pressed <= 0;
+      down_just_pressed <= 0;
+      left_just_pressed <= 0;
+      rotate_cw_just_pressed <= 0;
+      rotate_ccw_just_pressed <= 0;
+      start_just_pressed <= 0;
     end
   end
 
   next_piece next_piece_inst(
     .clk(clk1x),
 
-    .gen(generate_next_piece),
+    .gen(start_just_pressed),
 
     .read_index(next_piece_read_index),
     .cell_x(next_piece_cell_x),
@@ -240,13 +240,16 @@ module main (
     .type(next_piece_type)
   );
 
+  wire line_burned;
+  wire commit_burned_lines;
+
   scores scores_inst(
     .clk(clk1x),
-    .line_burned(line_burned), // rotate_cw
-    .commit_burned_lines(commit_burned_lines), // rotate_ccw
-    .soft_dropping(soft_dropping), // right
-    .reset_soft_drop_score(reset_soft_drop_score), // down
-    .commit_soft_drop_score(commit_soft_drop_score), // left
+    .line_burned(line_burned),
+    .commit_burned_lines(commit_burned_lines),
+    .soft_dropping(right_just_pressed),
+    .reset_soft_drop_score(down_just_pressed),
+    .commit_soft_drop_score(left_just_pressed),
     .score(score),
     .lines_burned_bcd(lines_burned_bcd)
   );
@@ -255,27 +258,11 @@ module main (
   wire[4:0] field_rendering_y;
   wire[2:0] field_rendering_data;
 
-  reg[3:0] field_x = 5;
-  reg[4:0] field_y = 5;
-  reg field_write_enable = 0;
-  reg[2:0] field_din = 3'b000;
-
-  integer field_fill_counter = 0;
-
-  always @(posedge clk1x) begin
-    if (!rst) begin
-      if (field_fill_counter != 10) begin
-        field_fill_counter <= field_fill_counter + 1;
-
-        field_x <= field_fill_counter + 3;
-        field_y <= field_fill_counter + 3;
-        field_din <= field_fill_counter;
-        field_write_enable <= 1;
-      end else begin
-        field_write_enable <= 0;
-      end
-    end
-  end
+  wire[3:0] field_x;
+  wire[4:0] field_y;
+  wire field_write_enable;
+  wire[2:0] field_din;
+  wire[2:0] field_dout;
 
   field field_inst (
     .clk(clk1x),
@@ -284,11 +271,30 @@ module main (
     .y_coord(field_y),
     .write_enable(field_write_enable),
     .din(field_din),
-    //.dout(),
+    .dout(field_dout),
 
     .rendering_x(field_rendering_x),
     .rendering_y(field_rendering_y),
     .rendering_dout(field_rendering_data)
+  );
+
+  burn burn_inst(
+    .clk(clk1x),
+
+    .start(start_just_pressed),
+    //.done(),
+
+    .field_x(field_x),
+    .field_y(field_y),
+
+    //.field_read_enable(),
+    .field_cell_read_value(field_dout),
+
+    .field_write_enable(field_write_enable),
+    .field_cell_write_value(field_din),
+
+    .line_burned(line_burned),
+    .commit_burned_lines(commit_burned_lines)
   );
 
   wire [7:0] pixel_r;
