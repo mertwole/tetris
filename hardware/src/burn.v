@@ -61,28 +61,34 @@ always @(posedge clk) begin
             end
         end
         STATE_SCANNING: begin
-            if (field_x == 12) begin
-                field_x <= 3;
-                field_y <= field_y + 1;
+            field_read_enable <= ~field_read_enable;
 
-                if (is_current_line_complete & (field_cell_read_value != 0)) begin
-                    lines_to_burn[amount_of_lines_to_burn] <= field_y;
-                    amount_of_lines_to_burn <= amount_of_lines_to_burn + 1;
+            if (!field_read_enable) begin
+                if (field_x == 12) begin
+                    field_x <= 3;
+                    field_y <= field_y + 1;
 
-                    if (amount_of_lines_to_burn == 3) begin
+                    if (is_current_line_complete & (field_cell_read_value != 0)) begin
+                        lines_to_burn[amount_of_lines_to_burn] <= field_y;
+                        amount_of_lines_to_burn <= amount_of_lines_to_burn + 1;
+
+                        if (amount_of_lines_to_burn == 3) begin
+                            field_read_enable <= 0;
+
+                            // We can early exit scanning here as `amount_of_lines_to_burn` cannot be bigger than 4.
+                            state <= STATE_PREPARE_TO_BURN;
+                        end
+                    end else if (field_y == 22) begin
                         field_read_enable <= 0;
 
-                        // We can early exit scanning here as `amount_of_lines_to_burn` cannot be bigger than 4.
                         state <= STATE_PREPARE_TO_BURN;
                     end
-                end else if (field_y == 22) begin
-                    field_read_enable <= 0;
 
-                    state <= STATE_PREPARE_TO_BURN;
+                    is_current_line_complete <= 1;
+                end else begin
+                    field_x <= field_x + 1;
+                    is_current_line_complete <= is_current_line_complete & (field_cell_read_value != 0);
                 end
-            end else begin
-                field_x <= field_x + 1;
-                is_current_line_complete <= is_current_line_complete & (field_cell_read_value != 0);
             end
         end
         STATE_PREPARE_TO_BURN: begin
