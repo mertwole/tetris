@@ -113,29 +113,31 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_FALL: begin
             field_read_enable <= 1;
+            field_write_enable <= 0;
             field_x <= 3;
             field_y <= lines_to_burn[amount_of_lines_to_burn - 1] + 1;
             state <= STATE_FALLING;
         end
         STATE_FALLING: begin // TODO: Play animation.
-            field_read_enable <= ~field_read_enable;
-            field_write_enable <= ~field_write_enable;
-
-            if (field_read_enable) begin
+            if (field_read_enable && !field_write_enable) begin
                 field_y <= field_y - 1;
-                field_cell_write_value <= field_cell_read_value;
 
                 field_read_enable <= 0;
+            end else if(!field_read_enable && !field_write_enable) begin
+                field_cell_write_value <= field_cell_read_value;
+
+                field_write_enable <= 1;
             end else begin
                 if (field_x == 12) begin
                     field_x <= 3;
                     if (field_y == 21) begin
-                        // NOTE: `amount_of_lines_to_burn` counter is reused here.
-                        amount_of_lines_to_burn <= amount_of_lines_to_burn - 1;
-                        field_y <= lines_to_burn[amount_of_lines_to_burn - 2] + 1;
-                        if (amount_of_lines_to_burn == 0) begin
+                        if (amount_of_lines_to_burn == 1) begin
                             state <= STATE_IDLE;
                         end else begin
+                            // NOTE: `amount_of_lines_to_burn` counter is reused here.
+                            amount_of_lines_to_burn <= amount_of_lines_to_burn - 1;
+                            field_y <= lines_to_burn[amount_of_lines_to_burn - 2] + 1;
+
                             field_read_enable <= 1;
                         end
                     end else begin
@@ -149,6 +151,8 @@ always @(posedge clk) begin
 
                     field_read_enable <= 1;
                 end
+
+                field_write_enable <= 0;
             end
         end
     endcase
