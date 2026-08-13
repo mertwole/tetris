@@ -327,10 +327,12 @@ module main (
 
   wire[2:0] current_piece_type;
 
+  wire[2:0] spawned_type = generate_next_piece ? next_piece_type : 0;
+
   piece piece_inst(
     .clk(clk1x),
 
-    //.spawned_type() TODO: Read from next_piece.
+    .spawned_type(spawned_type),
     
     .movement_in(piece_movement),
     .rotation_in(piece_rotation_signal),
@@ -359,7 +361,7 @@ module main (
     
     .piece_movement(piece_movement),
 
-    // .current_piece_read_enable()
+    // .current_piece_read_enable() TODO: Remove?
     .current_piece_read_index_out(current_piece_read_index),
     .current_piece_read_cell_x(current_piece_cell_x),
     .current_piece_read_cell_y(current_piece_cell_y),

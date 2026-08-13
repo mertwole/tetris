@@ -110,9 +110,15 @@ always @(posedge clk) begin
 
     case (state)
         STATE_INIT: begin
+            generate_new_piece <= 1;
+
             // TODO: Initialize piece, field and so on.
+
+            state <= STATE_PROCESSING_INPUT;
         end
         STATE_PROCESSING_INPUT: begin
+            generate_new_piece <= 0;
+            
             // TODO: Implement.
 
             state <= STATE_ARE;
