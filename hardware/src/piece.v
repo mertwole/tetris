@@ -10,15 +10,16 @@ module piece(
 
     // Move the piece.
     //
-    // Setting this wire to any value except 'b00 will cause the piece to move one block on the current clock 
+    // Setting this wire to any value except 'b000 will cause the piece to move one block on the current clock 
     // cycle. 
     // 
     // Direction of the movement is defined as follows:
-    // 'b00 - No movement
-    // 'b01 - Move down
-    // 'b10 - Move left
-    // 'b11 - Move right
-    input wire[1:0] movement_in,
+    // 'b000 - No movement
+    // 'b001 - Move down
+    // 'b010 - Move left
+    // 'b011 - Move right
+    // 'b100 - Move up
+    input wire[2:0] movement_in,
 
     // Rotate the piece.
     //
@@ -61,10 +62,11 @@ module piece(
     output reg[2:0] type
 );
 
-localparam MOVE_TYPE_NONE = 'b00;
-localparam MOVE_TYPE_DOWN = 'b01;
-localparam MOVE_TYPE_LEFT = 'b10;
-localparam MOVE_TYPE_RIGHT = 'b11;
+localparam MOVE_TYPE_NONE = 'b000;
+localparam MOVE_TYPE_DOWN = 'b001;
+localparam MOVE_TYPE_LEFT = 'b010;
+localparam MOVE_TYPE_RIGHT = 'b011;
+localparam MOVE_TYPE_UP = 'b100;
 
 localparam ROTATE_NONE = 'b00;
 localparam ROTATE_CW = 'b01;
@@ -106,6 +108,9 @@ always @(posedge clk) begin
             end
             MOVE_TYPE_RIGHT: begin
                 x <= x + 1;
+            end
+            MOVE_TYPE_UP: begin
+                y <= y + 1;
             end
         endcase
     end

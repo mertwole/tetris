@@ -5,7 +5,7 @@ module game_loop(
     input wire[4:0] current_level,
 
     // Move the current piece.
-    output reg[1:0] piece_movement = 'b00,
+    output reg[2:0] piece_movement = 'b000,
 
     // Enable read for the current piece.
     //
@@ -81,9 +81,15 @@ localparam STATE_CHECK_LOSE = 'b1010;
 localparam STATE_RENDER = 'b1011;
 localparam STATE_PADDING = 'b1100;
 
+localparam PIECE_MOVEMENT_NONE = 'b000;
+localparam PIECE_MOVEMENT_DOWN = 'b001;
+localparam PIECE_MOVEMENT_LEFT = 'b010;
+localparam PIECE_MOVEMENT_RIGHT = 'b011;
+localparam PIECE_MOVEMENT_UP = 'b100;
+
 reg[3:0] state = STATE_INIT;
 
-localparam CLK_PER_FRAME = 100_000;
+localparam CLK_PER_FRAME = 1_000_000;
 
 reg[17:0] current_frame_duration = 0;
 
@@ -125,7 +131,7 @@ always @(posedge clk) begin
                     soft_dropping_movement <= 1;
                 end
 
-                piece_movement <= 'b01; // TODO: use param.
+                piece_movement <= PIECE_MOVEMENT_DOWN;
                 current_piece_read_enable <= 1;
                 current_piece_read_index <= 0;
                 
@@ -139,7 +145,7 @@ always @(posedge clk) begin
         STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
             soft_dropping_movement <= 0;
 
-            piece_movement <= 'b00;
+            piece_movement <= PIECE_MOVEMENT_NONE;
 
             field_read_enable <= 1;
             field_x <= current_piece_read_cell_x;
@@ -168,7 +174,7 @@ always @(posedge clk) begin
         end
         STATE_SETTLE: begin
             field_read_enable <= 0;
-            piece_movement <= 'b01; // TODO: Use movement Up.
+            piece_movement <= PIECE_MOVEMENT_UP;
 
             are_timer <= are_by_piece_position(current_piece_center_y);
 
@@ -185,7 +191,7 @@ always @(posedge clk) begin
         STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
             commit_soft_drop_score <= 0;
 
-            piece_movement <= 'b00;
+            piece_movement <= PIECE_MOVEMENT_NONE;
 
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
