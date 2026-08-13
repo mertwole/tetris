@@ -264,10 +264,10 @@ module main (
   wire[4:0] field_rendering_y;
   wire[2:0] field_rendering_data;
 
-  wire[3:0] field_x;
-  wire[4:0] field_y;
-  wire field_write_enable;
-  wire[2:0] field_din;
+  wire[3:0] field_x = gated_burn_field_x + gated_game_loop_field_x;
+  wire[4:0] field_y = gated_burn_field_y + gated_game_loop_field_y;
+  wire field_write_enable = burn_field_write_enable | game_loop_field_write_enable;
+  wire[2:0] field_din = gated_burn_field_din + gated_game_loop_field_din;
   wire[2:0] field_dout;
 
   field field_inst (
@@ -287,20 +287,31 @@ module main (
   wire start_burn;
   wire burn_done;
 
+  wire burn_field_read_enable;
+  wire burn_field_write_enable;
+
+  wire[3:0] burn_field_x;
+  wire[4:0] burn_field_y;
+  wire [2:0] burn_field_din;
+
+  wire [3:0] gated_burn_field_x = (burn_field_read_enable || burn_field_write_enable) ? burn_field_x : 0;
+  wire [4:0] gated_burn_field_y = (burn_field_read_enable || burn_field_write_enable) ? burn_field_y : 0;
+  wire [2:0] gated_burn_field_din = (burn_field_read_enable || burn_field_write_enable) ? burn_field_din : 0;
+
   burn burn_inst(
     .clk(clk1x),
 
     .start(start_burn),
     .done(burn_done),
 
-    .field_x(field_x),
-    .field_y(field_y),
+    .field_x(burn_field_x),
+    .field_y(burn_field_y),
 
-    //.field_read_enable(),
+    .field_read_enable(burn_field_read_enable),
     .field_cell_read_value(field_dout),
 
-    .field_write_enable(field_write_enable),
-    .field_cell_write_value(field_din),
+    .field_write_enable(burn_field_write_enable),
+    .field_cell_write_value(burn_field_din),
 
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines)
@@ -330,6 +341,17 @@ module main (
     .type(current_piece_type)
   );
 
+  wire game_loop_field_read_enable;
+  wire game_loop_field_write_enable;
+
+  wire[3:0] game_loop_field_x;
+  wire[4:0] game_loop_field_y;
+  wire [2:0] game_loop_field_din;
+
+  wire [3:0] gated_game_loop_field_x = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_x : 0;
+  wire [4:0] gated_game_loop_field_y = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_y : 0;
+  wire [2:0] gated_game_loop_field_din = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_din : 0;
+
   game_loop game_loop_inst(
     .clk(clk1x),
     
@@ -345,14 +367,14 @@ module main (
     // .current_piece_center_y(), TODO: expose in piece module.
     .current_piece_type(current_piece_type),
 
-    .field_x(),
-    .field_y(),
+    .field_x(game_loop_field_x),
+    .field_y(game_loop_field_y),
 
-    .field_read_enable(),
+    .field_read_enable(game_loop_field_read_enable),
     .field_cell_read_value(field_dout),
 
-    .field_write_enable(),
-    .field_cell_write_value(),
+    .field_write_enable(game_loop_field_write_enable),
+    .field_cell_write_value(game_loop_field_din),
 
     .start_burn(start_burn),
     .burn_done(burn_done),
