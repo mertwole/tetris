@@ -92,9 +92,9 @@ localparam PIECE_MOVEMENT_UP = 'b100;
 
 reg[3:0] state = STATE_INIT;
 
-localparam CLK_PER_FRAME = 1_000_000;
+localparam CLK_PER_FRAME = 10_000_000;
 
-reg[17:0] current_frame_duration = 0;
+integer current_frame_duration = 0;
 
 reg soft_dropping = 0;
 reg[4:0] are_timer = 0;
@@ -105,16 +105,29 @@ assign current_piece_read_index_out = current_piece_read_index[1:0];
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 
+integer init_stage = 0;
+
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
 
     case (state)
         STATE_INIT: begin
-            generate_new_piece <= 1;
+            init_stage <= init_stage + 1;
+
+            case(init_stage)
+                0: begin
+                    generate_new_piece <= 1;
+                end
+                1: begin
+                    generate_new_piece <= 0;
+                end
+                2: begin
+                    generate_new_piece <= 1;
+                    state <= STATE_PROCESSING_INPUT;
+                end
+            endcase
 
             // TODO: Initialize piece, field and so on.
-
-            state <= STATE_PROCESSING_INPUT;
         end
         STATE_PROCESSING_INPUT: begin
             generate_new_piece <= 0;
@@ -199,6 +212,7 @@ always @(posedge clk) begin
 
             piece_movement <= PIECE_MOVEMENT_NONE;
 
+            field_cell_write_value <= current_piece_type;
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;

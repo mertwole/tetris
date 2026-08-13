@@ -173,7 +173,7 @@ module main (
     .next_piece_cell_y(next_piece_cell_y),
     .next_piece_type(next_piece_type),
 
-    .game_state('b01)
+    .game_state('b0101)
   );
 
   integer frame_clock = 0;
