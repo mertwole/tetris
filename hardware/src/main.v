@@ -297,6 +297,8 @@ module main (
     .commit_burned_lines(commit_burned_lines)
   );
 
+  game_loop game_loop_inst();
+
   wire [7:0] pixel_r;
   wire [7:0] pixel_g;
   wire [7:0] pixel_b;

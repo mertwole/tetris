@@ -44,7 +44,7 @@ module game_loop(
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.
-    output wire[2:0] field_cell_write_value,
+    output reg[2:0] field_cell_write_value,
 
     // Start processing the burn.
     output reg start_burn = 0,
@@ -78,8 +78,11 @@ localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b0111;
 localparam STATE_WRITE_PIECE_TO_FIELD = 'b1000;
 localparam STATE_BURNING = 'b1001;
 localparam STATE_CHECK_LOSE = 'b1010;
-localparam STATE_RENDER = 'b1011;
-localparam STATE_PADDING = 'b1100;
+localparam STATE_PREPARE_TO_PUT_PIECE_TO_FIELD = 'b1011;
+localparam STATE_PUT_PIECE_TO_FIELD = 'b1100;
+localparam STATE_RENDER = 'b1101;
+localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b1110;
+localparam STATE_PADDING = 'b1111;
 
 localparam PIECE_MOVEMENT_NONE = 'b000;
 localparam PIECE_MOVEMENT_DOWN = 'b001;
@@ -98,12 +101,9 @@ reg[4:0] are_timer = 0;
 reg[5:0] frames_from_last_fall = 0;
 
 reg[2:0] current_piece_read_index = 0;
-assign current_piece_read_index_out = current_piece_read_index_out[1:0];
+assign current_piece_read_index_out = current_piece_read_index[1:0];
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
-
-// Game loop can only write the piece type to the field.
-assign field_cell_write_value = current_piece_type;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -159,7 +159,7 @@ always @(posedge clk) begin
                 if (field_cell_read_value != 'b000) begin
                     state <= STATE_SETTLE;
                 end else begin
-                    state <= STATE_RENDER;
+                    state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
                 end
             end else begin
                 current_piece_read_index <= current_piece_read_index + 1;
@@ -229,14 +229,56 @@ always @(posedge clk) begin
             start_lose_check <= 0;
 
             if(lose_done) begin
-                state <= STATE_RENDER; // TODO: Check the result.
+                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD; // TODO: Check the lose result.
+            end
+        end
+        STATE_PREPARE_TO_PUT_PIECE_TO_FIELD: begin
+            current_piece_read_enable <= 1;
+            current_piece_read_index <= 0;
+            field_cell_write_value <= current_piece_type;
+
+            state <= STATE_PUT_PIECE_TO_FIELD;
+        end
+        STATE_PUT_PIECE_TO_FIELD: begin
+            field_x <= current_piece_read_cell_x;
+            field_y <= current_piece_read_cell_y;
+            field_write_enable <= 1;
+
+            if (current_piece_read_index == 3) begin
+                current_piece_read_enable <= 0;
+                
+                state <= STATE_RENDER;
+            end else begin
+                current_piece_read_index <= current_piece_read_index + 1;
             end
         end
         STATE_RENDER: begin
-            // TODO: Implement it later.
-            state <= STATE_PADDING;
+            field_write_enable <= 0;
+
+            // TODO: Implement rendering later.
+
+            current_piece_read_enable <= 1;
+            current_piece_read_index <= 0;
+            field_cell_write_value <= 'b000;
+
+            state <= STATE_REMOVE_PIECE_FROM_FIELD;
+        end
+        STATE_REMOVE_PIECE_FROM_FIELD: begin
+            field_x <= current_piece_read_cell_x;
+            field_y <= current_piece_read_cell_y;
+            field_write_enable <= 1;
+
+            if (current_piece_read_index == 3) begin
+                current_piece_read_enable <= 0;
+                
+                state <= STATE_PADDING;
+            end else begin
+                current_piece_read_index <= current_piece_read_index + 1;
+            end
         end
         STATE_PADDING: begin
+            field_write_enable <= 0;
+
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
                 current_frame_duration <= 0;    
                 state <= STATE_PROCESSING_INPUT;   
