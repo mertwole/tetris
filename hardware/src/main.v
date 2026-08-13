@@ -229,10 +229,12 @@ module main (
     end
   end
 
+  wire generate_next_piece;
+
   next_piece next_piece_inst(
     .clk(clk1x),
 
-    .gen(start_just_pressed),
+    .gen(generate_next_piece),
 
     .read_index(next_piece_read_index),
     .cell_x(next_piece_cell_x),
@@ -243,13 +245,17 @@ module main (
   wire line_burned;
   wire commit_burned_lines;
 
+  wire soft_dropping;
+  wire reset_soft_drop_score;
+  wire commit_soft_drop_score;
+
   scores scores_inst(
     .clk(clk1x),
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines),
-    .soft_dropping(right_just_pressed),
-    .reset_soft_drop_score(down_just_pressed),
-    .commit_soft_drop_score(left_just_pressed),
+    .soft_dropping(soft_dropping),
+    .reset_soft_drop_score(reset_soft_drop_score),
+    .commit_soft_drop_score(commit_soft_drop_score),
     .score(score),
     .lines_burned_bcd(lines_burned_bcd)
   );
@@ -278,11 +284,14 @@ module main (
     .rendering_dout(field_rendering_data)
   );
 
+  wire start_burn;
+  wire burn_done;
+
   burn burn_inst(
     .clk(clk1x),
 
-    .start(start_just_pressed),
-    //.done(),
+    .start(start_burn),
+    .done(burn_done),
 
     .field_x(field_x),
     .field_y(field_y),
@@ -295,6 +304,67 @@ module main (
 
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines)
+  );
+
+  wire[2:0] piece_movement;
+
+  wire[1:0] piece_rotation_signal = {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+
+  wire[1:0] current_piece_read_index;
+  wire[3:0] current_piece_cell_x;
+  wire[4:0] current_piece_cell_y;
+
+  wire[2:0] current_piece_type;
+
+  piece piece_inst(
+    .clk(clk1x),
+
+    //.spawned_type() TODO: Read from next_piece.
+    
+    .movement_in(piece_movement),
+    .rotation_in(piece_rotation_signal),
+
+    .read_index(current_piece_read_index),
+    .cell_x(current_piece_cell_x),
+    .cell_y(current_piece_cell_y),
+    .type(current_piece_type)
+  );
+
+  game_loop game_loop_inst(
+    .clk(clk1x),
+    
+    //.current_level() TODO
+    
+    .piece_movement(piece_movement),
+
+    // .current_piece_read_enable()
+    .current_piece_read_index_out(current_piece_read_index),
+    .current_piece_read_cell_x(current_piece_cell_x),
+    .current_piece_read_cell_y(current_piece_cell_y),
+
+    // .current_piece_center_y(), TODO: expose in piece module.
+    .current_piece_type(current_piece_type),
+
+    .field_x(),
+    .field_y(),
+
+    .field_read_enable(),
+    .field_cell_read_value(field_dout),
+
+    .field_write_enable(),
+    .field_cell_write_value(),
+
+    .start_burn(start_burn),
+    .burn_done(burn_done),
+
+    // .start_lose_check(), TODO
+    .lose_done(1), // TODO
+
+    .generate_new_piece(generate_next_piece),
+
+    .soft_dropping_movement(soft_dropping),
+    .reset_soft_drop_score(reset_soft_drop_score),
+    .commit_soft_drop_score(commit_soft_drop_score)
   );
 
   wire [7:0] pixel_r;
