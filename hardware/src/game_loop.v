@@ -259,7 +259,7 @@ always @(posedge clk) begin
         STATE_BURNING: begin
             start_burn <= 0;
 
-            if (burn_done) begin
+            if (!start_burn && burn_done) begin
                 generate_new_piece <= 1;
                 start_lose_check <= 1;
 
