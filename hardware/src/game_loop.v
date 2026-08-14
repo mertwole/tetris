@@ -64,7 +64,9 @@ module game_loop(
     // Reset current soft drop score.
     output reg reset_soft_drop_score = 0,
     // Commit the soft drop score.
-    output reg commit_soft_drop_score = 0
+    output reg commit_soft_drop_score = 0,
+
+    input wire proceed_rendering
 );
 
 localparam STATE_INIT = 'b0000;
@@ -104,6 +106,8 @@ reg[2:0] current_piece_read_index = 0;
 assign current_piece_read_index_out = current_piece_read_index[1:0];
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
+
+reg settlement_check_flag = 0;
 
 integer init_stage = 0;
 
@@ -162,43 +166,58 @@ always @(posedge clk) begin
             end
         end
         STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
-            soft_dropping_movement <= 0;
+            if(current_piece_read_cell_y <= 2) begin
+                piece_movement <= PIECE_MOVEMENT_UP;
 
-            piece_movement <= PIECE_MOVEMENT_NONE;
+                state <= STATE_SETTLE;
+            end else begin
+                soft_dropping_movement <= 0;
 
-            field_read_enable <= 1;
-            field_x <= current_piece_read_cell_x;
-            field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= current_piece_read_index + 1;
+                piece_movement <= PIECE_MOVEMENT_NONE;
 
-            state <= STATE_SETTLEMENT_CHECK;
+                field_read_enable <= 1;
+                settlement_check_flag <= 1;
+                field_x <= current_piece_read_cell_x;
+                field_y <= current_piece_read_cell_y;
+                current_piece_read_index <= current_piece_read_index + 1;
+
+                state <= STATE_SETTLEMENT_CHECK;
+            end
         end
         STATE_SETTLEMENT_CHECK: begin
-            field_read_enable <= ~field_read_enable;
-            if(!field_read_enable) begin
-                if (current_piece_read_index == 4) begin
-                    // TODO: Also consider settled when reached the bottom.
-                    if (field_cell_read_value != 'b000) begin
-                        state <= STATE_SETTLE;
+            if(current_piece_read_cell_y <= 2) begin
+                piece_movement <= PIECE_MOVEMENT_UP;
+
+                state <= STATE_SETTLE;
+            end else begin
+                settlement_check_flag <= ~settlement_check_flag;
+                if(!settlement_check_flag) begin
+                    if (current_piece_read_index == 4) begin
+                        if (field_cell_read_value != 'b000) begin
+                            piece_movement <= PIECE_MOVEMENT_UP;
+
+                            state <= STATE_SETTLE;
+                        end else begin
+                            state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
+                        end
                     end else begin
-                        state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
-                    end
-                end else begin
-                    current_piece_read_index <= current_piece_read_index + 1;
+                        current_piece_read_index <= current_piece_read_index + 1;
 
-                    field_x <= current_piece_read_cell_x;
-                    field_y <= current_piece_read_cell_y;
+                        field_x <= current_piece_read_cell_x;
+                        field_y <= current_piece_read_cell_y;
 
-                    // TODO: Also consider settled when reached the bottom.
-                    if (field_cell_read_value != 'b000) begin
-                        state <= STATE_SETTLE;
+                        if (field_cell_read_value != 'b000) begin
+                            piece_movement <= PIECE_MOVEMENT_UP;
+
+                            state <= STATE_SETTLE;
+                        end
                     end
                 end
             end
         end
         STATE_SETTLE: begin
             field_read_enable <= 0;
-            piece_movement <= PIECE_MOVEMENT_UP;
+            piece_movement <= PIECE_MOVEMENT_NONE;
 
             are_timer <= are_by_piece_position(current_piece_center_y);
 
@@ -214,8 +233,6 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
             commit_soft_drop_score <= 0;
-
-            piece_movement <= PIECE_MOVEMENT_NONE;
 
             field_cell_write_value <= current_piece_type;
             field_write_enable <= 1;
@@ -282,11 +299,13 @@ always @(posedge clk) begin
 
             // TODO: Implement rendering later.
 
-            current_piece_read_enable <= 1;
-            current_piece_read_index <= 0;
-            field_cell_write_value <= 'b000;
+            if (proceed_rendering) begin
+                current_piece_read_enable <= 1;
+                current_piece_read_index <= 0;
+                field_cell_write_value <= 'b000;
 
-            state <= STATE_REMOVE_PIECE_FROM_FIELD;
+                state <= STATE_REMOVE_PIECE_FROM_FIELD;
+            end
         end
         STATE_REMOVE_PIECE_FROM_FIELD: begin
             field_x <= current_piece_read_cell_x;
@@ -304,10 +323,10 @@ always @(posedge clk) begin
         STATE_PADDING: begin
             field_write_enable <= 0;
 
-            if (current_frame_duration == CLK_PER_FRAME - 1) begin
-                current_frame_duration <= 0;    
+            //if (current_frame_duration == CLK_PER_FRAME - 1) begin
+            //    current_frame_duration <= 0;    
                 state <= STATE_PROCESSING_INPUT;   
-            end
+            //end
         end
     endcase
 end

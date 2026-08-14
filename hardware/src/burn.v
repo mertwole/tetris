@@ -56,6 +56,8 @@ reg[4:0] lines_to_burn [3:0];
 reg[2:0] amount_of_lines_to_burn = 0;
 reg[2:0] currently_burning_y = 0;
 
+reg scanning_flag = 0;
+
 always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
@@ -66,6 +68,7 @@ always @(posedge clk) begin
                 field_y <= 3;
                 field_write_enable <= 0;
                 field_read_enable <= 1;
+                scanning_flag <= 1;
                 is_current_line_complete <= 1;
                 amount_of_lines_to_burn <= 0;
                 currently_burning_y <= 0;
@@ -74,9 +77,9 @@ always @(posedge clk) begin
             end
         end
         STATE_SCANNING: begin
-            field_read_enable <= ~field_read_enable;
+            scanning_flag <= ~scanning_flag;
 
-            if (!field_read_enable) begin
+            if (!scanning_flag) begin
                 if (field_x == 12) begin
                     field_x <= 3;
                     field_y <= field_y + 1;
