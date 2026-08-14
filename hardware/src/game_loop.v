@@ -192,9 +192,9 @@ always @(posedge clk) begin
                     // TODO: Also consider settled when reached the bottom.
                     if (field_cell_read_value != 'b000) begin
                         state <= STATE_SETTLE;
+                    end
                 end
             end
-        end
         end
         STATE_SETTLE: begin
             field_read_enable <= 0;
