@@ -80,8 +80,8 @@ reg [4:0] y;
 // Value of 'b00 corresponds to spawn orientation, 'b01 - spawn orientation turned clockwise and so on.
 reg[1:0] rotation;
 
-wire cell_x_offset;
-wire cell_y_offset;
+wire[3:0] cell_x_offset;
+wire[4:0] cell_y_offset;
 
 assign {cell_x_offset, cell_y_offset} = get_cell_offsets(type, rotation, read_index);
 assign cell_x = x + cell_x_offset;

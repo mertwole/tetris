@@ -174,22 +174,27 @@ always @(posedge clk) begin
             state <= STATE_SETTLEMENT_CHECK;
         end
         STATE_SETTLEMENT_CHECK: begin
-            if (current_piece_read_index == 4) begin
-                if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLE;
+            field_read_enable <= ~field_read_enable;
+            if(!field_read_enable) begin
+                if (current_piece_read_index == 4) begin
+                    // TODO: Also consider settled when reached the bottom.
+                    if (field_cell_read_value != 'b000) begin
+                        state <= STATE_SETTLE;
+                    end else begin
+                        state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
+                    end
                 end else begin
-                    state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
-                end
-            end else begin
-                current_piece_read_index <= current_piece_read_index + 1;
+                    current_piece_read_index <= current_piece_read_index + 1;
 
-                field_x <= current_piece_read_cell_x;
-                field_y <= current_piece_read_cell_y;
+                    field_x <= current_piece_read_cell_x;
+                    field_y <= current_piece_read_cell_y;
 
-                if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLE;
+                    // TODO: Also consider settled when reached the bottom.
+                    if (field_cell_read_value != 'b000) begin
+                        state <= STATE_SETTLE;
                 end
             end
+        end
         end
         STATE_SETTLE: begin
             field_read_enable <= 0;
@@ -216,7 +221,7 @@ always @(posedge clk) begin
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= current_piece_read_index + 1;
+            current_piece_read_index <= 0;//current_piece_read_index + 1;
 
             state <= STATE_WRITE_PIECE_TO_FIELD;
         end
