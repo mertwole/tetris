@@ -103,7 +103,7 @@ assign current_piece_read_index_out = current_piece_read_index[1:0];
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 
-reg settlement_check_flag = 0;
+reg read_field_delay = 0;
 
 integer init_stage = 0;
 
@@ -173,7 +173,7 @@ always @(posedge clk) begin
                 piece_movement <= PIECE_MOVEMENT_NONE;
 
                 field_read_enable <= 1;
-                settlement_check_flag <= 1;
+                read_field_delay <= 1;
                 field_x <= current_piece_read_cell_x;
                 field_y <= current_piece_read_cell_y;
                 current_piece_read_index <= current_piece_read_index + 1;
@@ -187,8 +187,8 @@ always @(posedge clk) begin
 
                 state <= STATE_SETTLE;
             end else begin
-                settlement_check_flag <= ~settlement_check_flag;
-                if(!settlement_check_flag) begin
+                read_field_delay <= ~read_field_delay;
+                if(!read_field_delay) begin
                     if (current_piece_read_index == 4) begin
                         if (field_cell_read_value != 'b000) begin
                             piece_movement <= PIECE_MOVEMENT_UP;
@@ -234,7 +234,7 @@ always @(posedge clk) begin
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= 0;//current_piece_read_index + 1;
+            current_piece_read_index <= 0;
 
             state <= STATE_WRITE_PIECE_TO_FIELD;
         end
