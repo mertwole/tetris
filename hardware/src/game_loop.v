@@ -1,10 +1,15 @@
 module game_loop(
     input wire clk,
 
+    // Button for clockwise piece rotation.
     input wire button_rotate_cw,
+    // Button for counter-clockwise piece rotation.
     input wire button_rotate_ccw,
+    // Button for moving the piece left.
     input wire button_left,
+    // Button for moving the piece right.
     input wire button_right,
+    // Button for soft drop activation.
     input wire button_down,
 
     // A current level.
