@@ -176,45 +176,6 @@ module main (
     .game_state('b0101)
   );
 
-  integer frame_clock = 0;
-
-  reg prev_frame_right_pressed = 0;
-  reg right_just_pressed = 0;
-
-  reg prev_frame_down_pressed = 0;
-  reg down_just_pressed = 0;
-
-  reg prev_frame_left_pressed = 0;
-  reg left_just_pressed = 0;
-
-  reg prev_frame_start_pressed = 0;
-  reg start_just_pressed = 0;
-
-  always @(posedge clk1x) begin
-    if (frame_clock == 1_000_000) begin
-      frame_clock <= 0;
-
-      prev_frame_right_pressed <= button_right_pressed;
-      right_just_pressed <= !prev_frame_right_pressed && button_right_pressed;
-
-      prev_frame_down_pressed <= button_down_pressed;
-      down_just_pressed <= !prev_frame_down_pressed && button_down_pressed;
-
-      prev_frame_left_pressed <= button_left_pressed;
-      left_just_pressed <= !prev_frame_left_pressed && button_left_pressed;
-
-      prev_frame_start_pressed <= button_start_pressed;
-      start_just_pressed <= !prev_frame_start_pressed && button_start_pressed;
-    end else begin 
-      frame_clock <= frame_clock + 1;
-
-      right_just_pressed <= 0;
-      down_just_pressed <= 0;
-      left_just_pressed <= 0;
-      start_just_pressed <= 0;
-    end
-  end
-
   wire generate_next_piece;
 
   next_piece next_piece_inst(
