@@ -388,9 +388,7 @@ module main (
 
     .soft_dropping_movement(soft_dropping),
     .reset_soft_drop_score(reset_soft_drop_score),
-    .commit_soft_drop_score(commit_soft_drop_score),
-
-    .proceed_rendering(start_just_pressed)
+    .commit_soft_drop_score(commit_soft_drop_score)
   );
 
   wire [7:0] pixel_r;

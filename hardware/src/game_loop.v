@@ -64,9 +64,7 @@ module game_loop(
     // Reset current soft drop score.
     output reg reset_soft_drop_score = 0,
     // Commit the soft drop score.
-    output reg commit_soft_drop_score = 0,
-
-    input wire proceed_rendering
+    output reg commit_soft_drop_score = 0
 );
 
 localparam STATE_INIT = 'b0000;
@@ -94,7 +92,7 @@ localparam PIECE_MOVEMENT_UP = 'b100;
 
 reg[3:0] state = STATE_INIT;
 
-localparam CLK_PER_FRAME = 10_000_000;
+localparam CLK_PER_FRAME = 1_000_000;
 
 integer current_frame_duration = 0;
 
@@ -302,12 +300,15 @@ always @(posedge clk) begin
 
             // TODO: Implement rendering later.
 
-            if (proceed_rendering) begin
+            // TODO: Move this condition to the `STATE_PADDING`.
+            if (current_frame_duration == CLK_PER_FRAME - 1) begin
+                current_frame_duration <= 0;    
+
                 current_piece_read_enable <= 1;
                 current_piece_read_index <= 0;
                 field_cell_write_value <= 'b000;
 
-                state <= STATE_REMOVE_PIECE_FROM_FIELD;
+                state <= STATE_REMOVE_PIECE_FROM_FIELD;  
             end
         end
         STATE_REMOVE_PIECE_FROM_FIELD: begin
