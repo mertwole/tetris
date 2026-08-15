@@ -73,22 +73,24 @@ module game_loop(
     output reg commit_soft_drop_score = 0
 );
 
-localparam STATE_INIT = 'b0000;
-localparam STATE_PROCESSING_INPUT = 'b0001;
-localparam STATE_ARE = 'b0010;
-localparam STATE_GRAVITY = 'b0011;
-localparam STATE_PREPARE_TO_SETTLEMENT_CHECK = 'b0100;
-localparam STATE_SETTLEMENT_CHECK = 'b0101;
-localparam STATE_SETTLE = 'b0110;
-localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b0111;
-localparam STATE_WRITE_PIECE_TO_FIELD = 'b1000;
-localparam STATE_BURNING = 'b1001;
-localparam STATE_CHECK_LOSE = 'b1010;
-localparam STATE_PREPARE_TO_PUT_PIECE_TO_FIELD = 'b1011;
-localparam STATE_PUT_PIECE_TO_FIELD = 'b1100;
-localparam STATE_RENDER = 'b1101;
-localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b1110;
-localparam STATE_PADDING = 'b1111;
+localparam STATE_INIT = 'b00000;
+localparam STATE_PROCESSING_INPUT = 'b00001;
+localparam STATE_PREPARE_TO_BOUNDS_CHECK = 'b00010;
+localparam STATE_BOUNDS_CHECK = 'b00011;
+localparam STATE_ARE = 'b00100;
+localparam STATE_GRAVITY = 'b00101;
+localparam STATE_PREPARE_TO_SETTLEMENT_CHECK = 'b00110;
+localparam STATE_SETTLEMENT_CHECK = 'b00111;
+localparam STATE_SETTLE = 'b01000;
+localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b01001;
+localparam STATE_WRITE_PIECE_TO_FIELD = 'b01010;
+localparam STATE_BURNING = 'b01011;
+localparam STATE_CHECK_LOSE = 'b01100;
+localparam STATE_PREPARE_TO_PUT_PIECE_TO_FIELD = 'b01101;
+localparam STATE_PUT_PIECE_TO_FIELD = 'b01110;
+localparam STATE_RENDER = 'b01111;
+localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b10000;
+localparam STATE_PADDING = 'b10001;
 
 localparam PIECE_MOVEMENT_NONE = 'b000;
 localparam PIECE_MOVEMENT_DOWN = 'b001;
@@ -96,7 +98,7 @@ localparam PIECE_MOVEMENT_LEFT = 'b010;
 localparam PIECE_MOVEMENT_RIGHT = 'b011;
 localparam PIECE_MOVEMENT_UP = 'b100;
 
-reg[3:0] state = STATE_INIT;
+reg[4:0] state = STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
@@ -125,6 +127,9 @@ wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 reg read_field_delay = 0;
 
 integer init_stage = 0;
+
+reg[2:0] piece_movement_inverse = 0;
+reg[1:0] piece_rotation_inverse = 0;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -165,11 +170,83 @@ always @(posedge clk) begin
                 'b01: piece_movement <= PIECE_MOVEMENT_RIGHT;
             endcase
 
-            state <= STATE_ARE;
+            current_piece_read_index <= 0;
+            state <= STATE_PREPARE_TO_BOUNDS_CHECK;
+        end
+        STATE_PREPARE_TO_BOUNDS_CHECK: begin
+            case (piece_movement)
+                PIECE_MOVEMENT_LEFT: piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                PIECE_MOVEMENT_RIGHT: piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                default: piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+            endcase
+
+            piece_rotation_inverse <= ~piece_rotation;
+
+            piece_rotation <= 0;
+            piece_movement <= PIECE_MOVEMENT_NONE;
+
+            if(
+                current_piece_read_cell_y <= 2 || 
+                current_piece_read_cell_x <= 2 || 
+                current_piece_read_cell_x >= 13
+            ) begin
+                piece_movement <= piece_movement_inverse;
+                piece_rotation <= piece_rotation_inverse;
+
+                state <= STATE_ARE;
+            end else begin
+                soft_dropping_movement <= 0;
+
+                field_read_enable <= 1;
+                read_field_delay <= 1;
+                field_x <= current_piece_read_cell_x;
+                field_y <= current_piece_read_cell_y;
+                current_piece_read_index <= current_piece_read_index + 1;
+
+                state <= STATE_BOUNDS_CHECK;
+            end
+        end
+        STATE_BOUNDS_CHECK: begin
+            if(
+                current_piece_read_cell_y <= 2 || 
+                current_piece_read_cell_x <= 2 || 
+                current_piece_read_cell_x >= 13
+            ) begin
+                piece_movement <= piece_movement_inverse;
+                piece_rotation <= piece_rotation_inverse;
+
+                state <= STATE_ARE;
+            end else begin
+                read_field_delay <= ~read_field_delay;
+                if(!read_field_delay) begin
+                    if (current_piece_read_index == 4) begin
+                        if (field_cell_read_value != 'b000) begin   
+                            piece_movement <= piece_movement_inverse;
+                            piece_rotation <= piece_rotation_inverse;
+                        end
+
+                        state <= STATE_ARE;
+                    end else begin
+                        current_piece_read_index <= current_piece_read_index + 1;
+
+                        field_x <= current_piece_read_cell_x;
+                        field_y <= current_piece_read_cell_y;
+
+                        if (field_cell_read_value != 'b000) begin       
+                            piece_movement <= piece_movement_inverse;
+                            piece_rotation <= piece_rotation_inverse;
+
+                            state <= STATE_ARE;
+                        end
+                    end
+                end
+            end
         end
         STATE_ARE: begin
-            piece_rotation <= 0;
+            field_read_enable <= 0;
+
             piece_movement <= 0;
+            piece_rotation <= 0;
 
             if (are_timer <= 1) begin
                 state <= STATE_GRAVITY;
