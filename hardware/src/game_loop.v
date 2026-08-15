@@ -1,11 +1,19 @@
 module game_loop(
     input wire clk,
 
+    input wire button_rotate_cw,
+    input wire button_rotate_ccw,
+    input wire button_left,
+    input wire button_right,
+    input wire button_down,
+
     // A current level.
     input wire[4:0] current_level,
 
     // Move the current piece.
     output reg[2:0] piece_movement = 'b000,
+    // Rotate the current piece.
+    output reg[1:0] piece_rotation = 'b00,
 
     // An index of the current piece cell that's being read.
     //
@@ -90,6 +98,17 @@ localparam PIECE_MOVEMENT_UP = 'b100;
 
 reg[3:0] state = STATE_INIT;
 
+reg rotate_cw_prev_state = 0;
+reg rotate_ccw_prev_state = 0;
+reg left_prev_state = 0;
+reg right_prev_state = 0;
+
+wire rotate_cw_just_pressed = button_rotate_cw & !rotate_cw_prev_state;
+wire rotate_ccw_just_pressed = button_rotate_ccw & !rotate_ccw_prev_state;
+
+wire left_just_pressed = button_left & !left_prev_state;
+wire right_just_pressed = button_right & !right_prev_state;
+
 localparam CLK_PER_FRAME = 1_000_000;
 
 integer current_frame_duration = 0;
@@ -132,11 +151,26 @@ always @(posedge clk) begin
         STATE_PROCESSING_INPUT: begin
             generate_new_piece <= 0;
             
-            // TODO: Implement.
+            rotate_cw_prev_state = button_rotate_cw;
+            rotate_ccw_prev_state = button_rotate_ccw;
+            left_prev_state = button_left;
+            right_prev_state = button_right;
+
+            piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+            soft_dropping <= button_down;
+
+            // TODO: DAS.
+            case ({left_just_pressed, right_just_pressed})
+                'b10: piece_movement <= PIECE_MOVEMENT_LEFT;
+                'b01: piece_movement <= PIECE_MOVEMENT_RIGHT;
+            endcase
 
             state <= STATE_ARE;
         end
         STATE_ARE: begin
+            piece_rotation <= 0;
+            piece_movement <= 0;
+
             if (are_timer <= 1) begin
                 state <= STATE_GRAVITY;
             end else begin
