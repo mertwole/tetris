@@ -249,6 +249,8 @@ module main (
   wire reset_soft_drop_score;
   wire commit_soft_drop_score;
 
+  wire[4:0] current_level;
+
   scores scores_inst(
     .clk(clk1x),
     .line_burned(line_burned),
@@ -257,7 +259,8 @@ module main (
     .reset_soft_drop_score(reset_soft_drop_score),
     .commit_soft_drop_score(commit_soft_drop_score),
     .score(score),
-    .lines_burned_bcd(lines_burned_bcd)
+    .lines_burned_bcd(lines_burned_bcd),
+    .level(current_level)
   );
 
   wire[3:0] field_rendering_x;
@@ -324,6 +327,7 @@ module main (
   wire[1:0] current_piece_read_index;
   wire[3:0] current_piece_cell_x;
   wire[4:0] current_piece_cell_y;
+  wire[4:0] current_piece_center_y;
 
   wire[2:0] current_piece_type;
 
@@ -340,6 +344,7 @@ module main (
     .read_index(current_piece_read_index),
     .cell_x(current_piece_cell_x),
     .cell_y(current_piece_cell_y),
+    .center_y(current_piece_center_y),
     .type(current_piece_type)
   );
 
@@ -357,16 +362,15 @@ module main (
   game_loop game_loop_inst(
     .clk(clk1x),
     
-    //.current_level() TODO
+    .current_level(current_level),
     
     .piece_movement(piece_movement),
 
-    // .current_piece_read_enable() TODO: Remove?
     .current_piece_read_index_out(current_piece_read_index),
     .current_piece_read_cell_x(current_piece_cell_x),
     .current_piece_read_cell_y(current_piece_cell_y),
 
-    // .current_piece_center_y(), TODO: expose in piece module.
+    .current_piece_center_y(current_piece_center_y),
     .current_piece_type(current_piece_type),
 
     .field_x(game_loop_field_x),

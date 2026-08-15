@@ -49,6 +49,11 @@ module piece(
     // See `read_index` description for more details.
     output wire[4:0] cell_y,
 
+    // Y coordinate of the center cell.
+    //
+    // Used for the ARE timer setup.
+    output wire[4:0] center_y,
+
     // Type of the piece.
     //
     // 'b000 - invalid
@@ -74,6 +79,8 @@ localparam ROTATE_CCW = 'b10;
 
 reg [3:0] x;
 reg [4:0] y;
+
+assign center_y = y;
 
 // Rotation of the piece.
 // 
