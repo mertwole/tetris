@@ -6,7 +6,7 @@ module io(
 
     output reg[7:0] next_piece_leds = 0,
 
-    output reg[3:0] game_state_leds = 0,
+    output wire[3:0] game_state_leds,
 
     input wire button_start,
     input wire button_rotate_cw,
@@ -23,7 +23,7 @@ module io(
     input wire next_piece_cell_y,
     input wire[2:0] next_piece_type,
 
-    input wire[1:0] game_state,
+    input wire[3:0] game_state,
 
     output wire button_start_pressed,
     output wire button_rotate_cw_pressed,
@@ -32,6 +32,8 @@ module io(
     output wire button_down_pressed,
     output wire button_left_pressed
 );
+
+assign game_state_leds = game_state;
 
 integer digit_switch_counter = 0;
 
@@ -156,15 +158,6 @@ always @(posedge clk) begin
 
         next_piece_leds_buffer[{next_piece_cell_y, next_piece_cell_x}] <= 1;
     end
-end
-
-always @* begin
-    case (game_state)
-        'b00: game_state_leds = 'b1000;
-        'b01: game_state_leds = 'b0100;
-        'b10: game_state_leds = 'b0010;
-        'b11: game_state_leds = 'b0001;
-    endcase
 end
 
 reg[1:0] button_start_buffer = 0;

@@ -33,13 +33,16 @@ module scores(
     // Total amound of burned lines in the current game.
     //
     // Encoded as 3-digit BCD.
-    output reg[11:0] lines_burned_bcd
+    output reg[11:0] lines_burned_bcd,
+
+    // A current level.
+    output wire[4:0] level
 );
 
 reg[2:0] lines_burned_from_last_time = 0;
 reg[4:0] soft_drop_score = 0;
 
-wire[4:0] level = lines_burned_bcd[11:8] * 10 + lines_burned_bcd[7:4];
+assign level = lines_burned_bcd[11:8] * 10 + lines_burned_bcd[7:4];
 
 wire[3:0] lines_burned_digit_0_inc = lines_burned_bcd[11:8] + 1;
 wire[3:0] lines_burned_digit_1_inc = lines_burned_bcd[7:4] + 1;

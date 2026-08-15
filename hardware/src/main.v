@@ -173,7 +173,7 @@ module main (
     .next_piece_cell_y(next_piece_cell_y),
     .next_piece_type(next_piece_type),
 
-    .game_state('b01)
+    .game_state('b0101)
   );
 
   integer frame_clock = 0;
@@ -229,10 +229,12 @@ module main (
     end
   end
 
+  wire generate_next_piece;
+
   next_piece next_piece_inst(
     .clk(clk1x),
 
-    .gen(start_just_pressed),
+    .gen(generate_next_piece),
 
     .read_index(next_piece_read_index),
     .cell_x(next_piece_cell_x),
@@ -243,25 +245,32 @@ module main (
   wire line_burned;
   wire commit_burned_lines;
 
+  wire soft_dropping;
+  wire reset_soft_drop_score;
+  wire commit_soft_drop_score;
+
+  wire[4:0] current_level;
+
   scores scores_inst(
     .clk(clk1x),
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines),
-    .soft_dropping(right_just_pressed),
-    .reset_soft_drop_score(down_just_pressed),
-    .commit_soft_drop_score(left_just_pressed),
+    .soft_dropping(soft_dropping),
+    .reset_soft_drop_score(reset_soft_drop_score),
+    .commit_soft_drop_score(commit_soft_drop_score),
     .score(score),
-    .lines_burned_bcd(lines_burned_bcd)
+    .lines_burned_bcd(lines_burned_bcd),
+    .level(current_level)
   );
 
   wire[3:0] field_rendering_x;
   wire[4:0] field_rendering_y;
   wire[2:0] field_rendering_data;
 
-  wire[3:0] field_x;
-  wire[4:0] field_y;
-  wire field_write_enable;
-  wire[2:0] field_din;
+  wire[3:0] field_x = gated_burn_field_x + gated_game_loop_field_x;
+  wire[4:0] field_y = gated_burn_field_y + gated_game_loop_field_y;
+  wire field_write_enable = burn_field_write_enable | game_loop_field_write_enable;
+  wire[2:0] field_din = gated_burn_field_din + gated_game_loop_field_din;
   wire[2:0] field_dout;
 
   field field_inst (
@@ -278,23 +287,112 @@ module main (
     .rendering_dout(field_rendering_data)
   );
 
+  wire start_burn;
+  wire burn_done;
+
+  wire burn_field_read_enable;
+  wire burn_field_write_enable;
+
+  wire[3:0] burn_field_x;
+  wire[4:0] burn_field_y;
+  wire [2:0] burn_field_din;
+
+  wire [3:0] gated_burn_field_x = (burn_field_read_enable || burn_field_write_enable) ? burn_field_x : 0;
+  wire [4:0] gated_burn_field_y = (burn_field_read_enable || burn_field_write_enable) ? burn_field_y : 0;
+  wire [2:0] gated_burn_field_din = (burn_field_read_enable || burn_field_write_enable) ? burn_field_din : 0;
+
   burn burn_inst(
     .clk(clk1x),
 
-    .start(start_just_pressed),
-    //.done(),
+    .start(start_burn),
+    .done(burn_done),
 
-    .field_x(field_x),
-    .field_y(field_y),
+    .field_x(burn_field_x),
+    .field_y(burn_field_y),
 
-    //.field_read_enable(),
+    .field_read_enable(burn_field_read_enable),
     .field_cell_read_value(field_dout),
 
-    .field_write_enable(field_write_enable),
-    .field_cell_write_value(field_din),
+    .field_write_enable(burn_field_write_enable),
+    .field_cell_write_value(burn_field_din),
 
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines)
+  );
+
+  wire[2:0] piece_movement;
+
+  wire[1:0] piece_rotation_signal = {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+
+  wire[1:0] current_piece_read_index;
+  wire[3:0] current_piece_cell_x;
+  wire[4:0] current_piece_cell_y;
+  wire[4:0] current_piece_center_y;
+
+  wire[2:0] current_piece_type;
+
+  wire[2:0] spawned_type = generate_next_piece ? next_piece_type : 0;
+
+  piece piece_inst(
+    .clk(clk1x),
+
+    .spawned_type(spawned_type),
+    
+    .movement_in(piece_movement),
+    .rotation_in(piece_rotation_signal),
+
+    .read_index(current_piece_read_index),
+    .cell_x(current_piece_cell_x),
+    .cell_y(current_piece_cell_y),
+    .center_y(current_piece_center_y),
+    .type(current_piece_type)
+  );
+
+  wire game_loop_field_read_enable;
+  wire game_loop_field_write_enable;
+
+  wire[3:0] game_loop_field_x;
+  wire[4:0] game_loop_field_y;
+  wire [2:0] game_loop_field_din;
+
+  wire [3:0] gated_game_loop_field_x = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_x : 0;
+  wire [4:0] gated_game_loop_field_y = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_y : 0;
+  wire [2:0] gated_game_loop_field_din = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_din : 0;
+
+  game_loop game_loop_inst(
+    .clk(clk1x),
+    
+    .current_level(current_level),
+    
+    .piece_movement(piece_movement),
+
+    .current_piece_read_index_out(current_piece_read_index),
+    .current_piece_read_cell_x(current_piece_cell_x),
+    .current_piece_read_cell_y(current_piece_cell_y),
+
+    .current_piece_center_y(current_piece_center_y),
+    .current_piece_type(current_piece_type),
+
+    .field_x(game_loop_field_x),
+    .field_y(game_loop_field_y),
+
+    .field_read_enable(game_loop_field_read_enable),
+    .field_cell_read_value(field_dout),
+
+    .field_write_enable(game_loop_field_write_enable),
+    .field_cell_write_value(game_loop_field_din),
+
+    .start_burn(start_burn),
+    .burn_done(burn_done),
+
+    // .start_lose_check(), TODO
+    .lose_done(1), // TODO
+
+    .generate_new_piece(generate_next_piece),
+
+    .soft_dropping_movement(soft_dropping),
+    .reset_soft_drop_score(reset_soft_drop_score),
+    .commit_soft_drop_score(commit_soft_drop_score)
   );
 
   wire [7:0] pixel_r;

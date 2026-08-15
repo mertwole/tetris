@@ -56,6 +56,8 @@ reg[4:0] lines_to_burn [3:0];
 reg[2:0] amount_of_lines_to_burn = 0;
 reg[2:0] currently_burning_y = 0;
 
+reg delay_after_read = 0;
+
 always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
@@ -66,6 +68,7 @@ always @(posedge clk) begin
                 field_y <= 3;
                 field_write_enable <= 0;
                 field_read_enable <= 1;
+                delay_after_read <= 1;
                 is_current_line_complete <= 1;
                 amount_of_lines_to_burn <= 0;
                 currently_burning_y <= 0;
@@ -74,9 +77,9 @@ always @(posedge clk) begin
             end
         end
         STATE_SCANNING: begin
-            field_read_enable <= ~field_read_enable;
+            delay_after_read <= ~delay_after_read;
 
-            if (!field_read_enable) begin
+            if (!delay_after_read) begin
                 if (field_x == 12) begin
                     field_x <= 3;
                     field_y <= field_y + 1;
@@ -132,6 +135,7 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_FALL: begin
             field_read_enable <= 1;
+            delay_after_read <= 1;
             field_write_enable <= 0;
             field_x <= 3;
             field_y <= lines_to_burn[amount_of_lines_to_burn - 1] + 1;
@@ -141,15 +145,18 @@ always @(posedge clk) begin
         end
         STATE_FALLING: begin // TODO: Play animation.
             if (field_read_enable && !field_write_enable) begin
-                field_y <= field_y - 1;
-
                 line_burned <= 0;
 
-                field_read_enable <= 0;
-            end else if(!field_read_enable && !field_write_enable) begin
-                field_cell_write_value <= field_cell_read_value;
+                if (delay_after_read) begin
+                    delay_after_read <= 0;
+                end else begin
+                    field_y <= field_y - 1;
 
-                field_write_enable <= 1;
+                    field_cell_write_value <= field_cell_read_value;
+
+                    field_read_enable <= 0;
+                    field_write_enable <= 1;
+                end
             end else begin
                 if (field_x == 12) begin
                     field_x <= 3;
@@ -166,17 +173,20 @@ always @(posedge clk) begin
                             line_burned <= 1;
 
                             field_read_enable <= 1;
+                            delay_after_read <= 1;
                         end
                     end else begin
                         field_y <= field_y + 2;
 
                         field_read_enable <= 1;
+                        delay_after_read <= 1;
                     end
                 end else begin
                     field_x <= field_x + 1;
                     field_y <= field_y + 1;
 
                     field_read_enable <= 1;
+                    delay_after_read <= 1;
                 end
 
                 field_write_enable <= 0;

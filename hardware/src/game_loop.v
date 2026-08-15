@@ -7,12 +7,10 @@ module game_loop(
     // Move the current piece.
     output reg[2:0] piece_movement = 'b000,
 
-    // Enable read for the current piece.
-    //
-    // When it's enabled, piece cell coordinates will appear on `current_piece_read_cell_x` and 
-    // `current_piece_read_cell_y` when `current_piece_read_index_out` is set to the corresponding cell index.
-    output reg current_piece_read_enable = 0,
     // An index of the current piece cell that's being read.
+    //
+    // Piece cell coordinates will appear on `current_piece_read_cell_x` and 
+    // `current_piece_read_cell_y` when `current_piece_read_index_out` is set to the corresponding cell index.
     output wire[1:0] current_piece_read_index_out,
     // X coordinate of the current piece cell that's being read.
     input wire[3:0] current_piece_read_cell_x,
@@ -94,7 +92,7 @@ reg[3:0] state = STATE_INIT;
 
 localparam CLK_PER_FRAME = 1_000_000;
 
-reg[17:0] current_frame_duration = 0;
+integer current_frame_duration = 0;
 
 reg soft_dropping = 0;
 reg[4:0] are_timer = 0;
@@ -105,76 +103,118 @@ assign current_piece_read_index_out = current_piece_read_index[1:0];
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 
+reg settlement_check_flag = 0;
+
+integer init_stage = 0;
+
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
 
     case (state)
         STATE_INIT: begin
+            init_stage <= init_stage + 1;
+
+            case(init_stage)
+                0: begin
+                    generate_new_piece <= 1;
+                end
+                1: begin
+                    generate_new_piece <= 0;
+                end
+                2: begin
+                    generate_new_piece <= 1;
+                    state <= STATE_PROCESSING_INPUT;
+                end
+            endcase
+
             // TODO: Initialize piece, field and so on.
         end
         STATE_PROCESSING_INPUT: begin
+            generate_new_piece <= 0;
+            
             // TODO: Implement.
 
             state <= STATE_ARE;
         end
         STATE_ARE: begin
-            are_timer <= are_timer - 1;
-            if (are_timer == 1) begin
+            if (are_timer <= 1) begin
                 state <= STATE_GRAVITY;
+            end else begin
+                are_timer <= are_timer - 1;
+                state <= STATE_RENDER;
             end
         end
         STATE_GRAVITY: begin
-            if (frames_from_last_fall + 1 >= current_gravity) begin
-                frames_from_last_fall <= 0;
+            if (frames_from_last_fall >= current_gravity) begin
+                frames_from_last_fall <= 1;
 
                 if (soft_dropping) begin
                     soft_dropping_movement <= 1;
                 end
 
                 piece_movement <= PIECE_MOVEMENT_DOWN;
-                current_piece_read_enable <= 1;
                 current_piece_read_index <= 0;
                 
                 state <= STATE_PREPARE_TO_SETTLEMENT_CHECK;
             end else begin
                 frames_from_last_fall <= frames_from_last_fall + 1;
-
-                state <= STATE_PROCESSING_INPUT;
+                    
+                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
             end
         end
         STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
-            soft_dropping_movement <= 0;
+            if(current_piece_read_cell_y <= 2) begin
+                piece_movement <= PIECE_MOVEMENT_UP;
 
-            piece_movement <= PIECE_MOVEMENT_NONE;
-
-            field_read_enable <= 1;
-            field_x <= current_piece_read_cell_x;
-            field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= current_piece_read_index + 1;
-
-            state <= STATE_SETTLEMENT_CHECK;
-        end
-        STATE_SETTLEMENT_CHECK: begin
-            if (current_piece_read_index == 4) begin
-                if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLE;
-                end else begin
-                    state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
-                end
+                state <= STATE_SETTLE;
             end else begin
-                current_piece_read_index <= current_piece_read_index + 1;
+                soft_dropping_movement <= 0;
 
+                piece_movement <= PIECE_MOVEMENT_NONE;
+
+                field_read_enable <= 1;
+                settlement_check_flag <= 1;
                 field_x <= current_piece_read_cell_x;
                 field_y <= current_piece_read_cell_y;
+                current_piece_read_index <= current_piece_read_index + 1;
 
-                if (field_cell_read_value != 'b000) begin
-                    state <= STATE_SETTLE;
+                state <= STATE_SETTLEMENT_CHECK;
+            end
+        end
+        STATE_SETTLEMENT_CHECK: begin
+            if(current_piece_read_cell_y <= 2) begin
+                piece_movement <= PIECE_MOVEMENT_UP;
+
+                state <= STATE_SETTLE;
+            end else begin
+                settlement_check_flag <= ~settlement_check_flag;
+                if(!settlement_check_flag) begin
+                    if (current_piece_read_index == 4) begin
+                        if (field_cell_read_value != 'b000) begin
+                            piece_movement <= PIECE_MOVEMENT_UP;
+
+                            state <= STATE_SETTLE;
+                        end else begin
+                            state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
+                        end
+                    end else begin
+                        current_piece_read_index <= current_piece_read_index + 1;
+
+                        field_x <= current_piece_read_cell_x;
+                        field_y <= current_piece_read_cell_y;
+
+                        if (field_cell_read_value != 'b000) begin
+                            piece_movement <= PIECE_MOVEMENT_UP;
+
+                            state <= STATE_SETTLE;
+                        end
+                    end
                 end
             end
         end
         STATE_SETTLE: begin
             field_read_enable <= 0;
-            piece_movement <= PIECE_MOVEMENT_UP;
+            piece_movement <= PIECE_MOVEMENT_NONE;
 
             are_timer <= are_by_piece_position(current_piece_center_y);
 
@@ -183,7 +223,6 @@ always @(posedge clk) begin
             end
             soft_dropping <= 0;
 
-            current_piece_read_enable <= 1;
             current_piece_read_index <= 0;
 
             state <= STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD;
@@ -191,19 +230,17 @@ always @(posedge clk) begin
         STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
             commit_soft_drop_score <= 0;
 
-            piece_movement <= PIECE_MOVEMENT_NONE;
-
+            field_cell_write_value <= current_piece_type;
             field_write_enable <= 1;
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= current_piece_read_index + 1;
+            current_piece_read_index <= 0;//current_piece_read_index + 1;
 
             state <= STATE_WRITE_PIECE_TO_FIELD;
         end
         STATE_WRITE_PIECE_TO_FIELD: begin
             if (current_piece_read_index == 4) begin
                 field_write_enable <= 0;
-                current_piece_read_enable <= 0;
                 start_burn <= 1;
 
                 state <= STATE_BURNING;
@@ -217,8 +254,9 @@ always @(posedge clk) begin
         STATE_BURNING: begin
             start_burn <= 0;
 
-            if (burn_done) begin
+            if (!start_burn && burn_done) begin
                 generate_new_piece <= 1;
+                frames_from_last_fall <= 0;
                 start_lose_check <= 1;
 
                 state <= STATE_CHECK_LOSE;
@@ -229,11 +267,10 @@ always @(posedge clk) begin
             start_lose_check <= 0;
 
             if(lose_done) begin
-                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD; // TODO: Check the lose result.
+                state <= STATE_RENDER; // TODO: Check the lose result.
             end
         end
         STATE_PREPARE_TO_PUT_PIECE_TO_FIELD: begin
-            current_piece_read_enable <= 1;
             current_piece_read_index <= 0;
             field_cell_write_value <= current_piece_type;
 
@@ -244,9 +281,7 @@ always @(posedge clk) begin
             field_y <= current_piece_read_cell_y;
             field_write_enable <= 1;
 
-            if (current_piece_read_index == 3) begin
-                current_piece_read_enable <= 0;
-                
+            if (current_piece_read_index == 3) begin                
                 state <= STATE_RENDER;
             end else begin
                 current_piece_read_index <= current_piece_read_index + 1;
@@ -257,20 +292,22 @@ always @(posedge clk) begin
 
             // TODO: Implement rendering later.
 
-            current_piece_read_enable <= 1;
-            current_piece_read_index <= 0;
-            field_cell_write_value <= 'b000;
+            // TODO: Move this condition to the `STATE_PADDING`.
+            if (current_frame_duration == CLK_PER_FRAME - 1) begin
+                current_frame_duration <= 0;    
 
-            state <= STATE_REMOVE_PIECE_FROM_FIELD;
+                current_piece_read_index <= 0;
+                field_cell_write_value <= 'b000;
+
+                state <= STATE_REMOVE_PIECE_FROM_FIELD;  
+            end
         end
         STATE_REMOVE_PIECE_FROM_FIELD: begin
             field_x <= current_piece_read_cell_x;
             field_y <= current_piece_read_cell_y;
             field_write_enable <= 1;
 
-            if (current_piece_read_index == 3) begin
-                current_piece_read_enable <= 0;
-                
+            if (current_piece_read_index == 3) begin                
                 state <= STATE_PADDING;
             end else begin
                 current_piece_read_index <= current_piece_read_index + 1;
@@ -279,17 +316,17 @@ always @(posedge clk) begin
         STATE_PADDING: begin
             field_write_enable <= 0;
 
-            if (current_frame_duration == CLK_PER_FRAME - 1) begin
-                current_frame_duration <= 0;    
+            //if (current_frame_duration == CLK_PER_FRAME - 1) begin
+            //    current_frame_duration <= 0;    
                 state <= STATE_PROCESSING_INPUT;   
-            end
+            //end
         end
     endcase
 end
 
 function [4:0] are_by_piece_position(input [4:0] current_piece_y);
     begin
-        are_by_piece_position = 10 + (current_piece_y >> 2) << 1;
+        are_by_piece_position = 10 + ((current_piece_y >> 2) << 1);
     end
 endfunction
 
