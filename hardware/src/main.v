@@ -176,59 +176,6 @@ module main (
     .game_state('b0101)
   );
 
-  integer frame_clock = 0;
-
-  reg prev_frame_right_pressed = 0;
-  reg right_just_pressed = 0;
-
-  reg prev_frame_down_pressed = 0;
-  reg down_just_pressed = 0;
-
-  reg prev_frame_left_pressed = 0;
-  reg left_just_pressed = 0;
-
-  reg prev_frame_rotate_cw_pressed = 0;
-  reg rotate_cw_just_pressed = 0;
-
-  reg prev_frame_rotate_ccw_pressed = 0;
-  reg rotate_ccw_just_pressed = 0;
-
-  reg prev_frame_start_pressed = 0;
-  reg start_just_pressed = 0;
-
-  always @(posedge clk1x) begin
-    if (frame_clock == 1_000_000) begin
-      frame_clock <= 0;
-
-      prev_frame_right_pressed <= button_right_pressed;
-      right_just_pressed <= !prev_frame_right_pressed && button_right_pressed;
-
-      prev_frame_down_pressed <= button_down_pressed;
-      down_just_pressed <= !prev_frame_down_pressed && button_down_pressed;
-
-      prev_frame_left_pressed <= button_left_pressed;
-      left_just_pressed <= !prev_frame_left_pressed && button_left_pressed;
-
-      prev_frame_rotate_cw_pressed <= button_rotate_cw_pressed;
-      rotate_cw_just_pressed <= !prev_frame_rotate_cw_pressed && button_rotate_cw_pressed;
-
-      prev_frame_rotate_ccw_pressed <= button_rotate_ccw_pressed;
-      rotate_ccw_just_pressed <= !prev_frame_rotate_ccw_pressed && button_rotate_ccw_pressed;
-
-      prev_frame_start_pressed <= button_start_pressed;
-      start_just_pressed <= !prev_frame_start_pressed && button_start_pressed;
-    end else begin 
-      frame_clock <= frame_clock + 1;
-
-      right_just_pressed <= 0;
-      down_just_pressed <= 0;
-      left_just_pressed <= 0;
-      rotate_cw_just_pressed <= 0;
-      rotate_ccw_just_pressed <= 0;
-      start_just_pressed <= 0;
-    end
-  end
-
   wire generate_next_piece;
 
   next_piece next_piece_inst(
@@ -322,8 +269,6 @@ module main (
 
   wire[2:0] piece_movement;
 
-  wire[1:0] piece_rotation_signal = {rotate_ccw_just_pressed, rotate_cw_just_pressed};
-
   wire[1:0] current_piece_read_index;
   wire[3:0] current_piece_cell_x;
   wire[4:0] current_piece_cell_y;
@@ -333,13 +278,15 @@ module main (
 
   wire[2:0] spawned_type = generate_next_piece ? next_piece_type : 0;
 
+  wire[1:0] piece_rotation;
+
   piece piece_inst(
     .clk(clk1x),
 
     .spawned_type(spawned_type),
     
     .movement_in(piece_movement),
-    .rotation_in(piece_rotation_signal),
+    .rotation_in(piece_rotation),
 
     .read_index(current_piece_read_index),
     .cell_x(current_piece_cell_x),
@@ -361,10 +308,18 @@ module main (
 
   game_loop game_loop_inst(
     .clk(clk1x),
+
+    .button_rotate_cw(button_rotate_cw_pressed),
+    .button_rotate_ccw(button_rotate_ccw_pressed),
+
+    .button_left(button_left_pressed),
+    .button_down(button_down_pressed),
+    .button_right(button_right_pressed),
     
     .current_level(current_level),
-    
+
     .piece_movement(piece_movement),
+    .piece_rotation(piece_rotation),
 
     .current_piece_read_index_out(current_piece_read_index),
     .current_piece_read_cell_x(current_piece_cell_x),
