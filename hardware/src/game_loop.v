@@ -141,14 +141,16 @@ always @(posedge clk) begin
             state <= STATE_ARE;
         end
         STATE_ARE: begin
-            are_timer <= are_timer - 1;
-            if (are_timer == 1) begin
+            if (are_timer <= 1) begin
                 state <= STATE_GRAVITY;
+            end else begin
+                are_timer <= are_timer - 1;
+                state <= STATE_RENDER;
             end
         end
         STATE_GRAVITY: begin
-            if (frames_from_last_fall + 1 >= current_gravity) begin
-                frames_from_last_fall <= 0;
+            if (frames_from_last_fall >= current_gravity) begin
+                frames_from_last_fall <= 1;
 
                 if (soft_dropping) begin
                     soft_dropping_movement <= 1;
@@ -161,8 +163,8 @@ always @(posedge clk) begin
                 state <= STATE_PREPARE_TO_SETTLEMENT_CHECK;
             end else begin
                 frames_from_last_fall <= frames_from_last_fall + 1;
-
-                state <= STATE_PROCESSING_INPUT;
+                    
+                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
             end
         end
         STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
@@ -261,6 +263,7 @@ always @(posedge clk) begin
 
             if (!start_burn && burn_done) begin
                 generate_new_piece <= 1;
+                frames_from_last_fall <= 0;
                 start_lose_check <= 1;
 
                 state <= STATE_CHECK_LOSE;
@@ -271,7 +274,7 @@ always @(posedge clk) begin
             start_lose_check <= 0;
 
             if(lose_done) begin
-                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD; // TODO: Check the lose result.
+                state <= STATE_RENDER; // TODO: Check the lose result.
             end
         end
         STATE_PREPARE_TO_PUT_PIECE_TO_FIELD: begin
@@ -333,7 +336,7 @@ end
 
 function [4:0] are_by_piece_position(input [4:0] current_piece_y);
     begin
-        are_by_piece_position = 10 + (current_piece_y >> 2) << 1;
+        are_by_piece_position = 10 + ((current_piece_y >> 2) << 1);
     end
 endfunction
 
