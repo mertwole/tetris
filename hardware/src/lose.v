@@ -22,7 +22,9 @@ module lose(
     // `field_write_enable` is asserted.
     output wire[2:0] field_cell_write_value,
 
+    // Start an operation on the current piece.
     output reg[1:0] piece_start_operation = 0,
+    // Result of the piece operation started by setting `piece_start_operation`.
     input wire[1:0] piece_operation_result
 );
 

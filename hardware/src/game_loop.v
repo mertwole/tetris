@@ -49,7 +49,9 @@ module game_loop(
     // Reset all the scores.
     output reg reset_scores = 0,
 
+    // Start an operation on the current piece.
     output reg[1:0] start_piece_operation,
+    // Result of the piece operation started by setting `piece_start_operation`.
     input wire[1:0] piece_operation_result
 );
 
