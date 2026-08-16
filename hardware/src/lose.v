@@ -31,83 +31,50 @@ module lose(
     // `field_write_enable` is asserted.
     output wire[2:0] field_cell_write_value,
 
-    // Request to read the current piece cell at index `current_piece_read_index`.
-    output reg current_piece_read_enable = 0, // TODO: Remove in favor of moving all the checks to `piece`.
-    // Index to read the current piece when `current_piece_read_enable` is asserted.
-    output wire [1:0] current_piece_read_index_out,
-    // X coordinate of the cell of the current piece.
-    input wire[3:0] current_piece_cell_x,
-    // Y coordinate of the cell of the current piece.
-    input wire[4:0] current_piece_cell_y
+    output reg[1:0] piece_start_operation = 0,
+    input wire[1:0] piece_operation_result
 );
 
-localparam STATE_IDLE = 'b000;
-localparam STATE_PREPARE_TO_SCAN = 'b001;
-localparam STATE_SCANNING = 'b010;
-localparam STATE_PREPARE_TO_ANIMATE = 'b011;
-localparam STATE_ANIMATING = 'b100;
+localparam STATE_IDLE = 'b00;
+localparam STATE_SCANNING = 'b01;
+localparam STATE_PREPARE_TO_ANIMATE = 'b10;
+localparam STATE_ANIMATING = 'b11;
 
-reg[2:0] state = STATE_IDLE;
+localparam PIECE_OPERATION_NONE = 'b00;
+localparam PIECE_OPERATION_COLLISION_CHECK = 'b01;
+
+localparam PIECE_NO_COLLISIONS_DETECTED = 'b01;
+localparam PIECE_COLLISION_DETECTED = 'b10;
+
+reg[1:0] state = STATE_IDLE;
 
 assign field_cell_write_value = 0; // Lose animation can only erase the cells.
-
-reg[2:0] current_piece_read_index = 0;
-assign current_piece_read_index_out = current_piece_read_index[1:0];
-
-reg read_delay = 0;
 
 always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
             if (start) begin
                 result <= 0;
+                piece_start_operation <= PIECE_OPERATION_COLLISION_CHECK;
 
-                current_piece_read_enable <= 1;
-                current_piece_read_index <= 0;
-
-                state <= STATE_PREPARE_TO_SCAN;
-            end else begin
-                field_read_enable <= 0;
-                current_piece_read_enable <= 0;
+                state <= STATE_SCANNING;
             end
         end
-        STATE_PREPARE_TO_SCAN: begin
-            field_x <= current_piece_cell_x;
-            field_y <= current_piece_cell_y;   
-            field_read_enable <= 1;
-            read_delay <= 1;
-            current_piece_read_index <= current_piece_read_index + 1;
-
-            state <= STATE_SCANNING;
-        end
         STATE_SCANNING: begin
-            read_delay <= ~read_delay;
-            if(!read_delay) begin
-                // It's checked with 4 because `field_cell_read_value` contains value of the field cell read in
-                // the previous clock cycle.
-                if (current_piece_read_index == 4) begin
-                    if (field_cell_read_value != 'b000) begin
+            piece_start_operation <= PIECE_OPERATION_NONE;
+            if (piece_start_operation != PIECE_OPERATION_COLLISION_CHECK) begin
+                case (piece_operation_result)
+                    PIECE_COLLISION_DETECTED: begin
                         state <= STATE_PREPARE_TO_ANIMATE;
-                    end else begin
+                    end
+                    PIECE_NO_COLLISIONS_DETECTED: begin
                         result <= 'b01;
-
                         state <= STATE_IDLE;
                     end
-                end else begin
-                    current_piece_read_index <= current_piece_read_index + 1;
-
-                    field_x <= current_piece_cell_x;
-                    field_y <= current_piece_cell_y;
-
-                    if (field_cell_read_value != 'b000) begin
-                        state <= STATE_PREPARE_TO_ANIMATE;
-                    end
-                end
+                endcase
             end
         end
         STATE_PREPARE_TO_ANIMATE: begin
-            current_piece_read_enable <= 0;
-            field_read_enable <= 0;
             field_write_enable <= 1;
 
             field_x <= 3;

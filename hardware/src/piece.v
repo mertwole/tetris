@@ -31,23 +31,23 @@ module piece(
     // 'b11 - No rotation
     input wire [1:0] rotation_in,
 
-    // Request to read specific cell.
+    // Start a field operation.
+    //
+    // 'b00 - None
+    // 'b01 - Bounds and collisions check
+    // 'b10 - Write piece to field
+    // 'b11 - Remove piece from the field
+    input wire[1:0] start_operation,
+
+    // The field operation result
+    //
+    // 'b00 - Operation in progress
+    // 'b01 - Operation complete
+    // 'b10 - Operation complete
     // 
-    // Every piece consists of 4 cells, indexed from 0 to 3(inclusive). When `read_index` is set to some
-    // value, coordinates of the corresponding cell will appear on `cell_x` and `cell_y`.
-    //
-    // NOTE: Valid values appear on `cell_x` and `cell_y` immediately.
-    input wire[1:0] read_index,
-
-    // X coordinate of the cell being read.
-    //
-    // See `read_index` description for more details.
-    output wire[3:0] cell_x,
-
-    // Y coordinate of the cell being read.
-    //
-    // See `read_index` description for more details.
-    output wire[4:0] cell_y,
+    // After the bounds check operation result of 'b01 means that no collisions/out of bounds were detected, 
+    // while result of 'b10 means that the collision/out of bounds was detected.
+    output reg[1:0] operation_result = 0,
 
     // Y coordinate of the center cell.
     //
@@ -64,7 +64,28 @@ module piece(
     // 'b101 - S
     // 'b110 - T
     // 'b111 - Z
-    output reg[2:0] type
+    output reg[2:0] type,
+
+    // X coordinate of the field cell, used for both read and write operations.
+    output reg[3:0] field_x,
+    // Y coordinate of the field cell, used for both read and write operations.
+    output reg[4:0] field_y,
+
+    // Request to read the field cell at coordinates (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_write_enable`.
+    output reg field_read_enable = 0,
+    // Result of the field read operation initiated by asserting `field_read_enable`.
+    input wire[2:0] field_cell_read_value,
+
+    // Request to write the value `field_cell_write_value` to the field cell at coordinates 
+    // (`field_x`, `field_y`).
+    //
+    // NOTE: Will never be active simultaneously with `field_read_enable`.
+    output reg field_write_enable = 0,
+    // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
+    // `field_write_enable` is asserted.
+    output wire[2:0] field_cell_write_value
 );
 
 localparam MOVE_TYPE_NONE = 'b000;
@@ -93,6 +114,23 @@ wire[4:0] cell_y_offset;
 assign {cell_x_offset, cell_y_offset} = get_cell_offsets(type, rotation, read_index);
 assign cell_x = x + cell_x_offset;
 assign cell_y = y + cell_y_offset;
+
+always @(posedge clk) begin
+    case(start_operation)
+        'b01: begin
+            operation_result <= 0;
+            // 'b01 - Bounds and collisions check
+        end
+        'b10: begin
+            operation_result <= 0;
+            // 'b10 - Write piece to field
+        end
+        'b11: begin
+            operation_result <= 0;
+            // 'b11 - Remove piece from the field            
+        end
+    endcase
+end
 
 always @(posedge clk) begin
     if (spawned_type != 'b000) begin
