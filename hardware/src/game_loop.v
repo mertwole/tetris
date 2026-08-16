@@ -53,24 +53,20 @@ module game_loop(
     input wire[1:0] piece_operation_result
 );
 
-localparam STATE_INIT = 'b00000;
-localparam STATE_PROCESSING_INPUT = 'b00001;
-localparam STATE_PREPARE_TO_BOUNDS_CHECK = 'b00010; // TODO: Remove.
-localparam STATE_BOUNDS_CHECK = 'b00011;
-localparam STATE_ARE = 'b00100;
-localparam STATE_GRAVITY = 'b00101;
-localparam STATE_PREPARE_TO_SETTLEMENT_CHECK = 'b00110; // TODO: Remove.
-localparam STATE_SETTLEMENT_CHECK = 'b00111;
-localparam STATE_SETTLE = 'b01000;
-localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b01001; // TODO: Remove
-localparam STATE_WRITE_PIECE_TO_FIELD = 'b01010;
-localparam STATE_BURNING = 'b01011;
-localparam STATE_CHECK_LOSE = 'b01100;
-localparam STATE_PREPARE_TO_PUT_PIECE_TO_FIELD = 'b01101; // TODO: Remove.
-localparam STATE_PUT_PIECE_TO_FIELD = 'b01110;
-localparam STATE_RENDER = 'b01111;
-localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b10000;
-localparam STATE_PADDING = 'b10001;
+localparam STATE_INIT = 'b0000;
+localparam STATE_PROCESSING_INPUT = 'b0001;
+localparam STATE_BOUNDS_CHECK = 'b0010;
+localparam STATE_ARE = 'b0011;
+localparam STATE_GRAVITY = 'b0100;
+localparam STATE_SETTLEMENT_CHECK = 'b0101;
+localparam STATE_SETTLE = 'b0110;
+localparam STATE_WRITE_PIECE_TO_FIELD = 'b0111;
+localparam STATE_BURNING = 'b1000;
+localparam STATE_CHECK_LOSE = 'b1001;
+localparam STATE_PUT_PIECE_TO_FIELD = 'b1010;
+localparam STATE_RENDER = 'b1011;
+localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b1100;
+localparam STATE_PADDING = 'b1101;
 
 localparam PIECE_MOVEMENT_NONE = 'b000;
 localparam PIECE_MOVEMENT_DOWN = 'b001;
@@ -86,7 +82,7 @@ localparam PIECE_OPERATION_ERASE = 'b11;
 localparam PIECE_NO_COLLISIONS_DETECTED = 'b01;
 localparam PIECE_COLLISION_DETECTED = 'b10;
 
-reg[4:0] state = STATE_INIT;
+reg[3:0] state = STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
