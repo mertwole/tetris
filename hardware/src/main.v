@@ -217,10 +217,10 @@ module main (
   wire[4:0] field_rendering_y;
   wire[2:0] field_rendering_data;
 
-  wire[3:0] field_x = gated_burn_field_x + gated_game_loop_field_x + gated_lose_field_x;
-  wire[4:0] field_y = gated_burn_field_y + gated_game_loop_field_y + gated_lose_field_y;
-  wire field_write_enable = burn_field_write_enable | game_loop_field_write_enable | lose_field_write_enable;
-  wire[2:0] field_din = gated_burn_field_din + gated_game_loop_field_din + gated_lose_field_din;
+  wire[3:0] field_x = gated_burn_field_x + gated_lose_field_x;
+  wire[4:0] field_y = gated_burn_field_y + gated_lose_field_y;
+  wire field_write_enable = burn_field_write_enable | lose_field_write_enable;
+  wire[2:0] field_din = gated_burn_field_din + gated_lose_field_din;
   wire[2:0] field_dout;
 
   field field_inst (
@@ -273,22 +273,26 @@ module main (
   wire start_lose;
   wire[1:0] lose_result;
 
-  wire lose_field_read_enable;
   wire lose_field_write_enable;
 
   wire[3:0] lose_field_x;
   wire[4:0] lose_field_y;
   wire [2:0] lose_field_din;
 
-  wire [3:0] gated_lose_field_x = (lose_field_read_enable || lose_field_write_enable) ? lose_field_x : 0;
-  wire [4:0] gated_lose_field_y = (lose_field_read_enable || lose_field_write_enable) ? lose_field_y : 0;
-  wire [2:0] gated_lose_field_din = (lose_field_read_enable || lose_field_write_enable) ? lose_field_din : 0;
+  wire [3:0] gated_lose_field_x = lose_field_write_enable ? lose_field_x : 0;
+  wire [4:0] gated_lose_field_y = lose_field_write_enable ? lose_field_y : 0;
+  wire [2:0] gated_lose_field_din = lose_field_write_enable ? lose_field_din : 0;
 
   wire lose_current_piece_read_enable;
   wire [1:0] lose_current_piece_read_index;
 
   wire[3:0] current_piece_cell_x;
   wire[4:0] current_piece_cell_y;
+
+  wire[1:0] start_piece_operation_lose;
+  wire[1:0] start_piece_operation_game_loop;
+  wire[1:0] start_piece_operation = start_piece_operation_lose + start_piece_operation_game_loop;
+  wire[1:0] piece_operation_result;
 
   lose lose_inst(
     .clk(clk1x),
@@ -299,33 +303,20 @@ module main (
     .field_x(lose_field_x),
     .field_y(lose_field_y),
 
-    .field_read_enable(lose_field_read_enable),
-    .field_cell_read_value(field_dout),
-
     .field_write_enable(lose_field_write_enable),
     .field_cell_write_value(lose_field_din),
 
-    .current_piece_read_enable(lose_current_piece_read_enable),
-    .current_piece_read_index_out(lose_current_piece_read_index),
-    .current_piece_cell_x(current_piece_cell_x),
-    .current_piece_cell_y(current_piece_cell_y)
+    .piece_start_operation(start_piece_operation_lose),
+    .piece_operation_result(piece_operation_result)
   );
 
   wire[2:0] piece_movement;
-
-  wire[1:0] game_loop_current_piece_read_index;
-
-  wire[1:0] current_piece_read_index = lose_current_piece_read_enable ? 
-    lose_current_piece_read_index : 
-    game_loop_current_piece_read_index;
+  wire[1:0] piece_rotation;
 
   wire[4:0] current_piece_center_y;
-
   wire[2:0] current_piece_type;
 
   wire[2:0] spawned_type = generate_next_piece ? next_piece_type : 0;
-
-  wire[1:0] piece_rotation;
 
   piece piece_inst(
     .clk(clk1x),
@@ -335,23 +326,12 @@ module main (
     .movement_in(piece_movement),
     .rotation_in(piece_rotation),
 
-    .read_index(current_piece_read_index),
-    .cell_x(current_piece_cell_x),
-    .cell_y(current_piece_cell_y),
+    .start_operation(start_piece_operation),
+    .operation_result(piece_operation_result),
+
     .center_y(current_piece_center_y),
     .type(current_piece_type)
   );
-
-  wire game_loop_field_read_enable;
-  wire game_loop_field_write_enable;
-
-  wire[3:0] game_loop_field_x;
-  wire[4:0] game_loop_field_y;
-  wire [2:0] game_loop_field_din;
-
-  wire [3:0] gated_game_loop_field_x = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_x : 0;
-  wire [4:0] gated_game_loop_field_y = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_y : 0;
-  wire [2:0] gated_game_loop_field_din = (game_loop_field_read_enable || game_loop_field_write_enable) ? game_loop_field_din : 0;
 
   game_loop game_loop_inst(
     .clk(clk1x),
@@ -368,21 +348,8 @@ module main (
     .piece_movement(piece_movement),
     .piece_rotation(piece_rotation),
 
-    .current_piece_read_index_out(game_loop_current_piece_read_index),
-    .current_piece_read_cell_x(current_piece_cell_x),
-    .current_piece_read_cell_y(current_piece_cell_y),
-
     .current_piece_center_y(current_piece_center_y),
     .current_piece_type(current_piece_type),
-
-    .field_x(game_loop_field_x),
-    .field_y(game_loop_field_y),
-
-    .field_read_enable(game_loop_field_read_enable),
-    .field_cell_read_value(field_dout),
-
-    .field_write_enable(game_loop_field_write_enable),
-    .field_cell_write_value(game_loop_field_din),
 
     .start_burn(start_burn),
     .burn_done(burn_done),
@@ -396,7 +363,10 @@ module main (
     .reset_soft_drop_score(reset_soft_drop_score),
     .commit_soft_drop_score(commit_soft_drop_score),
 
-    .reset_scores(reset_scores)
+    .reset_scores(reset_scores),
+
+    .start_piece_operation(start_piece_operation_game_loop),
+    .piece_operation_result(piece_operation_result)
   );
 
   wire [7:0] pixel_r;
