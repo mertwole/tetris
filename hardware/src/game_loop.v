@@ -64,8 +64,8 @@ module game_loop(
 
     // Start checking for lose.
     output reg start_lose_check = 0,
-    // Signalizes that the lose check/animation has completed.
-    input wire lose_done,
+    // The result of the lose check.
+    input wire[1:0] lose_result,
 
     // Randomly generate the new piece.
     output reg generate_new_piece = 0,
@@ -75,7 +75,10 @@ module game_loop(
     // Reset current soft drop score.
     output reg reset_soft_drop_score = 0,
     // Commit the soft drop score.
-    output reg commit_soft_drop_score = 0
+    output reg commit_soft_drop_score = 0,
+
+    // Reset all the scores.
+    output reg reset_scores = 0
 );
 
 localparam STATE_INIT = 'b00000;
@@ -382,8 +385,12 @@ always @(posedge clk) begin
             generate_new_piece <= 0;
             start_lose_check <= 0;
 
-            if(lose_done) begin
-                state <= STATE_RENDER; // TODO: Check the lose result.
+            if(!start_lose_check && (lose_result != 0)) begin
+                if (lose_result == 'b10) begin
+                    reset_scores <= 1;
+                end
+
+                state <= STATE_RENDER;
             end
         end
         STATE_PREPARE_TO_PUT_PIECE_TO_FIELD: begin
@@ -404,6 +411,7 @@ always @(posedge clk) begin
             end
         end
         STATE_RENDER: begin
+            reset_scores <= 0;
             field_write_enable <= 0;
 
             // TODO: Implement rendering later.
