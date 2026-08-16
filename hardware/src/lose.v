@@ -15,17 +15,8 @@ module lose(
     // Y coordinate of the field cell, used for both read and write operations.
     output reg[4:0] field_y,
 
-    // Request to read the field cell at coordinates (`field_x`, `field_y`).
-    //
-    // NOTE: Will never be active simultaneously with `field_write_enable`.
-    output reg field_read_enable = 0,
-    // Result of the field read operation initiated by asserting `field_read_enable`.
-    input wire[2:0] field_cell_read_value,
-
     // Request to write the value `field_cell_write_value` to the field cell at coordinates 
     // (`field_x`, `field_y`).
-    //
-    // NOTE: Will never be active simultaneously with `field_read_enable`.
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.

@@ -67,9 +67,9 @@ module piece(
     output reg[2:0] type,
 
     // X coordinate of the field cell, used for both read and write operations.
-    output reg[3:0] field_x,
+    output wire[3:0] field_x,
     // Y coordinate of the field cell, used for both read and write operations.
-    output reg[4:0] field_y,
+    output wire[4:0] field_y,
 
     // Request to read the field cell at coordinates (`field_x`, `field_y`).
     //
@@ -85,7 +85,7 @@ module piece(
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.
-    output wire[2:0] field_cell_write_value
+    output reg[2:0] field_cell_write_value
 );
 
 localparam MOVE_TYPE_NONE = 'b000;
@@ -97,6 +97,11 @@ localparam MOVE_TYPE_UP = 'b100;
 localparam ROTATE_NONE = 'b00;
 localparam ROTATE_CW = 'b01;
 localparam ROTATE_CCW = 'b10;
+
+localparam RESULT_NONE = 'b00;
+localparam RESULT_DONE = 'b01;
+localparam RESULT_NO_COLLISION = 'b01;
+localparam RESULT_COLLISION = 'b10;
 
 reg [3:0] x;
 reg [4:0] y;
@@ -111,23 +116,70 @@ reg[1:0] rotation;
 wire[3:0] cell_x_offset;
 wire[4:0] cell_y_offset;
 
+reg[1:0] read_index = 0;
+
 assign {cell_x_offset, cell_y_offset} = get_cell_offsets(type, rotation, read_index);
-assign cell_x = x + cell_x_offset;
-assign cell_y = y + cell_y_offset;
+assign field_x = x + cell_x_offset;
+assign field_y = y + cell_y_offset;
+
+localparam OP_STATE_INIT = 'b00;
+localparam OP_STATE_CHECKING = 'b01;
+localparam OP_STATE_WRITING = 'b10;
+
+reg[1:0] op_state = OP_STATE_INIT;
+
+reg field_read_delay = 0;
 
 always @(posedge clk) begin
-    case(start_operation)
-        'b01: begin
-            operation_result <= 0;
-            // 'b01 - Bounds and collisions check
+    case(op_state)
+        OP_STATE_INIT: begin
+            case(start_operation)
+                'b01: begin
+                    field_read_enable <= 1;
+                    read_field_delay <= 0;
+                    state <= OP_STATE_CHECKING;
+                end
+                'b10: begin
+                    field_cell_write_value <= type;
+                    field_write_enable <= 1;
+                    state <= OP_STATE_WRITING;
+                end
+                'b11: begin
+                    field_cell_write_value <= 'b000;
+                    field_write_enable <= 1;
+                    state <= OP_STATE_WRITING;
+                end
+            endcase
+
+            if(start_operation != 0) begin
+                operation_result <= 0;
+                read_index <= 0;
+            end
         end
-        'b10: begin
-            operation_result <= 0;
-            // 'b10 - Write piece to field
-        end
-        'b11: begin
-            operation_result <= 0;
-            // 'b11 - Remove piece from the field            
+        OP_STATE_CHECKING: begin
+            read_field_delay <= ~read_field_delay;
+            if (read_field_delay != 0) begin
+                read_index <= read_index + 1;
+
+                if (field_cell_read_value != 'b000) begin
+                    operation_result <= RESULT_COLLISION;
+                    field_read_enable <= 0;
+                    op_state <= OP_STATE_INIT;
+                end else if(read_index == 3) begin
+                    operation_result <= RESULT_NO_COLLISION;
+                    field_read_enable <= 0;
+                    op_state <= OP_STATE_INIT;
+                end
+            end
+        end 
+        OP_STATE_WRITING: begin
+            read_index <= read_index + 1;
+            
+            if(read_index == 3) begin
+                operation_result <= RESULT_DONE;
+                field_write_enable <= 0;
+                op_state <= OP_STATE_INIT;
+            end
         end
     endcase
 end
