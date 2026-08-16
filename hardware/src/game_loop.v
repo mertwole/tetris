@@ -382,7 +382,7 @@ always @(posedge clk) begin
             generate_new_piece <= 0;
             start_lose_check <= 0;
 
-            if(lose_done) begin
+            if(!start_lose_check & lose_done) begin
                 state <= STATE_RENDER; // TODO: Check the lose result.
             end
         end
