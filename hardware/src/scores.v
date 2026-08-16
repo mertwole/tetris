@@ -1,6 +1,11 @@
 module scores(
     input wire clk,
 
+    // Reset all the scores.
+    //
+    // Includes burned lines, level and score.
+    input wire reset_all,
+
     // Signalize that one line was burned.
     //
     // This should be used during the burn animation by setting it every time an individual line gets burned.
@@ -49,7 +54,12 @@ wire[3:0] lines_burned_digit_1_inc = lines_burned_bcd[7:4] + 1;
 wire[3:0] lines_burned_digit_2_inc = lines_burned_bcd[3:0] + 1;
 
 always @(posedge clk) begin
-    if (line_burned) begin
+    if (reset_all) begin
+        lines_burned_from_last_time <= 0;
+        soft_drop_score <= 0;
+        lines_burned_bcd <= 0;
+        score <= 0;
+    end else if (line_burned) begin
         soft_drop_score <= 0;
 
         lines_burned_from_last_time <= lines_burned_from_last_time + 1;

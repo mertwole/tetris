@@ -3,8 +3,12 @@ module lose(
 
     // Start checking the current piece cells and playing the lose animation(if required).
     input wire start,
-    // Asserted when all the lose-related operations are complete.
-    output wire done,
+    // Result of the lose check.
+    //
+    // 'b00 - check is not yet complete.
+    // 'b01 - check is negative
+    // 'b10 - check is positive
+    output reg[1:0] result,
 
     // X coordinate of the field cell, used for both read and write operations.
     output reg[3:0] field_x,
@@ -45,8 +49,6 @@ localparam STATE_ANIMATING = 'b100;
 
 reg[2:0] state = STATE_IDLE;
 
-assign done = state == STATE_IDLE;
-
 assign field_cell_write_value = 0; // Lose animation can only erase the cells.
 
 reg[2:0] current_piece_read_index = 0;
@@ -58,6 +60,8 @@ always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
             if (start) begin
+                result <= 0;
+
                 current_piece_read_enable <= 1;
                 current_piece_read_index <= 0;
 
@@ -85,6 +89,8 @@ always @(posedge clk) begin
                     if (field_cell_read_value != 'b000) begin
                         state <= STATE_PREPARE_TO_ANIMATE;
                     end else begin
+                        result <= 'b01;
+
                         state <= STATE_IDLE;
                     end
                 end else begin
@@ -114,8 +120,10 @@ always @(posedge clk) begin
                 field_x <= 3;
 
                 if (field_y == 3) begin
-                    state <= STATE_IDLE;
+                    result <= 'b10;
                     field_write_enable <= 0;
+
+                    state <= STATE_IDLE;
                 end else begin
                     field_y <= field_y - 1;
                 end

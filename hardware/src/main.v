@@ -198,8 +198,11 @@ module main (
 
   wire[4:0] current_level;
 
+  wire reset_scores;
+
   scores scores_inst(
     .clk(clk1x),
+    .reset_all(reset_scores),
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines),
     .soft_dropping(soft_dropping),
@@ -268,7 +271,7 @@ module main (
   );
 
   wire start_lose;
-  wire lose_done;
+  wire[1:0] lose_result;
 
   wire lose_field_read_enable;
   wire lose_field_write_enable;
@@ -291,7 +294,7 @@ module main (
     .clk(clk1x),
 
     .start(start_lose),
-    .done(lose_done),
+    .result(lose_result),
 
     .field_x(lose_field_x),
     .field_y(lose_field_y),
@@ -385,13 +388,15 @@ module main (
     .burn_done(burn_done),
 
     .start_lose_check(start_lose),
-    .lose_done(lose_done),
+    .lose_result(lose_result),
 
     .generate_new_piece(generate_next_piece),
 
     .soft_dropping_movement(soft_dropping),
     .reset_soft_drop_score(reset_soft_drop_score),
-    .commit_soft_drop_score(commit_soft_drop_score)
+    .commit_soft_drop_score(commit_soft_drop_score),
+
+    .reset_scores(reset_scores)
   );
 
   wire [7:0] pixel_r;
