@@ -161,7 +161,7 @@ always @(posedge clk) begin
             if (field_read_delay != 0) begin
                 read_index <= read_index + 1;
 
-                if (field_cell_read_value != 'b000) begin
+                if (field_cell_read_value != 'b000 || field_x < 3 || field_x > 12 || field_y < 3) begin
                     operation_result <= RESULT_COLLISION;
                     field_read_enable <= 0;
                     op_state <= OP_STATE_INIT;
