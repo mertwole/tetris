@@ -105,8 +105,6 @@ reg[5:0] frames_from_last_fall = 0;
 
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
 
-reg read_field_delay = 0;
-
 integer init_stage = 0;
 
 reg[2:0] piece_movement_inverse = 0;
@@ -163,13 +161,13 @@ always @(posedge clk) begin
                 end
             endcase
 
-            piece_start_operation <= PIECE_OPERATION_COLLISION_CHECK;
+            start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
             state <= STATE_BOUNDS_CHECK;
         end
         STATE_BOUNDS_CHECK: begin
             soft_dropping_movement <= 0;
             
-            if (piece_start_operation == PIECE_OPERATION_NONE) begin
+            if (start_piece_operation == PIECE_OPERATION_NONE) begin
                 case(piece_operation_result) 
                     PIECE_COLLISION_DETECTED: begin
                         piece_movement <= piece_movement_inverse;
@@ -184,7 +182,7 @@ always @(posedge clk) begin
             end else begin
                 piece_rotation <= 0;
                 piece_movement <= PIECE_MOVEMENT_NONE;
-                piece_start_operation <= PIECE_OPERATION_NONE;
+                start_piece_operation <= PIECE_OPERATION_NONE;
             end
         end
         STATE_ARE: begin

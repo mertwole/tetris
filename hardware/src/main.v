@@ -217,10 +217,10 @@ module main (
   wire[4:0] field_rendering_y;
   wire[2:0] field_rendering_data;
 
-  wire[3:0] field_x = gated_burn_field_x + gated_lose_field_x;
-  wire[4:0] field_y = gated_burn_field_y + gated_lose_field_y;
-  wire field_write_enable = burn_field_write_enable | lose_field_write_enable;
-  wire[2:0] field_din = gated_burn_field_din + gated_lose_field_din;
+  wire[3:0] field_x = gated_burn_field_x + gated_lose_field_x + gated_piece_field_x;
+  wire[4:0] field_y = gated_burn_field_y + gated_lose_field_y + gated_piece_field_y;
+  wire field_write_enable = burn_field_write_enable | lose_field_write_enable | piece_field_write_enable;
+  wire[2:0] field_din = gated_burn_field_din + gated_lose_field_din + gated_piece_field_din;
   wire[2:0] field_dout;
 
   field field_inst (
@@ -318,6 +318,17 @@ module main (
 
   wire[2:0] spawned_type = generate_next_piece ? next_piece_type : 0;
 
+  wire piece_field_read_enable;
+  wire piece_field_write_enable;
+
+  wire[3:0] piece_field_x;
+  wire[4:0] piece_field_y;
+  wire [2:0] piece_field_din;
+
+  wire [3:0] gated_piece_field_x = (piece_field_read_enable || piece_field_write_enable) ? piece_field_x : 0;
+  wire [4:0] gated_piece_field_y = (piece_field_read_enable || piece_field_write_enable) ? piece_field_y : 0;
+  wire [2:0] gated_piece_field_din = (piece_field_read_enable || piece_field_write_enable) ? piece_field_din : 0;
+
   piece piece_inst(
     .clk(clk1x),
 
@@ -330,7 +341,16 @@ module main (
     .operation_result(piece_operation_result),
 
     .center_y(current_piece_center_y),
-    .type(current_piece_type)
+    .type(current_piece_type),
+
+    .field_x(piece_field_x),
+    .field_y(piece_field_y),
+
+    .field_read_enable(piece_field_read_enable),
+    .field_cell_read_value(field_dout),
+
+    .field_write_enable(piece_field_write_enable),
+    .field_cell_write_value(piece_field_din)
   );
 
   game_loop game_loop_inst(

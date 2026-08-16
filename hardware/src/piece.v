@@ -136,18 +136,18 @@ always @(posedge clk) begin
             case(start_operation)
                 'b01: begin
                     field_read_enable <= 1;
-                    read_field_delay <= 0;
-                    state <= OP_STATE_CHECKING;
+                    field_read_delay <= 0;
+                    op_state <= OP_STATE_CHECKING;
                 end
                 'b10: begin
                     field_cell_write_value <= type;
                     field_write_enable <= 1;
-                    state <= OP_STATE_WRITING;
+                    op_state <= OP_STATE_WRITING;
                 end
                 'b11: begin
                     field_cell_write_value <= 'b000;
                     field_write_enable <= 1;
-                    state <= OP_STATE_WRITING;
+                    op_state <= OP_STATE_WRITING;
                 end
             endcase
 
@@ -157,8 +157,8 @@ always @(posedge clk) begin
             end
         end
         OP_STATE_CHECKING: begin
-            read_field_delay <= ~read_field_delay;
-            if (read_field_delay != 0) begin
+            field_read_delay <= ~field_read_delay;
+            if (field_read_delay != 0) begin
                 read_index <= read_index + 1;
 
                 if (field_cell_read_value != 'b000) begin
