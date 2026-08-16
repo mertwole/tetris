@@ -20,42 +20,11 @@ module game_loop(
     // Rotate the current piece.
     output reg[1:0] piece_rotation = 'b00,
 
-    // An index of the current piece cell that's being read.
-    //
-    // Piece cell coordinates will appear on `current_piece_read_cell_x` and 
-    // `current_piece_read_cell_y` when `current_piece_read_index_out` is set to the corresponding cell index.
-    output wire[1:0] current_piece_read_index_out,
-    // X coordinate of the current piece cell that's being read.
-    input wire[3:0] current_piece_read_cell_x,
-    // Y coordinate of the current piece cell that's being read.
-    input wire[4:0] current_piece_read_cell_y,
-
     // Y coordinate of the current piece center.
     input wire[4:0] current_piece_center_y,
 
     // A type of the current piece.
     input wire[2:0] current_piece_type,
-
-    // X coordinate of the field cell, used for both read and write operations.
-    output reg[3:0] field_x,
-    // Y coordinate of the field cell, used for both read and write operations.
-    output reg[4:0] field_y,
-
-    // Request to read the field cell at coordinates (`field_x`, `field_y`).
-    //
-    // NOTE: Will never be active simultaneously with `field_write_enable`.
-    output reg field_read_enable = 0,
-    // Result of the field read operation initiated by asserting `field_read_enable`.
-    input wire[2:0] field_cell_read_value,
-
-    // Request to write the value `field_cell_write_value` to the field cell at coordinates 
-    // (`field_x`, `field_y`).
-    //
-    // NOTE: Will never be active simultaneously with `field_read_enable`.
-    output reg field_write_enable = 0,
-    // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
-    // `field_write_enable` is asserted.
-    output reg[2:0] field_cell_write_value,
 
     // Start processing the burn.
     output reg start_burn = 0,
@@ -78,27 +47,28 @@ module game_loop(
     output reg commit_soft_drop_score = 0,
 
     // Reset all the scores.
-    output reg reset_scores = 0
+    output reg reset_scores = 0,
+
+    // Start an operation on the current piece.
+    output reg[1:0] start_piece_operation,
+    // Result of the piece operation started by setting `piece_start_operation`.
+    input wire[1:0] piece_operation_result
 );
 
-localparam STATE_INIT = 'b00000;
-localparam STATE_PROCESSING_INPUT = 'b00001;
-localparam STATE_PREPARE_TO_BOUNDS_CHECK = 'b00010;
-localparam STATE_BOUNDS_CHECK = 'b00011;
-localparam STATE_ARE = 'b00100;
-localparam STATE_GRAVITY = 'b00101;
-localparam STATE_PREPARE_TO_SETTLEMENT_CHECK = 'b00110;
-localparam STATE_SETTLEMENT_CHECK = 'b00111;
-localparam STATE_SETTLE = 'b01000;
-localparam STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD = 'b01001;
-localparam STATE_WRITE_PIECE_TO_FIELD = 'b01010;
-localparam STATE_BURNING = 'b01011;
-localparam STATE_CHECK_LOSE = 'b01100;
-localparam STATE_PREPARE_TO_PUT_PIECE_TO_FIELD = 'b01101;
-localparam STATE_PUT_PIECE_TO_FIELD = 'b01110;
-localparam STATE_RENDER = 'b01111;
-localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b10000;
-localparam STATE_PADDING = 'b10001;
+localparam STATE_INIT = 'b0000;
+localparam STATE_PROCESSING_INPUT = 'b0001;
+localparam STATE_BOUNDS_CHECK = 'b0010;
+localparam STATE_ARE = 'b0011;
+localparam STATE_GRAVITY = 'b0100;
+localparam STATE_SETTLEMENT_CHECK = 'b0101;
+localparam STATE_SETTLE = 'b0110;
+localparam STATE_WRITE_PIECE_TO_FIELD = 'b0111;
+localparam STATE_BURNING = 'b1000;
+localparam STATE_CHECK_LOSE = 'b1001;
+localparam STATE_PUT_PIECE_TO_FIELD = 'b1010;
+localparam STATE_RENDER = 'b1011;
+localparam STATE_REMOVE_PIECE_FROM_FIELD = 'b1100;
+localparam STATE_PADDING = 'b1101;
 
 localparam PIECE_MOVEMENT_NONE = 'b000;
 localparam PIECE_MOVEMENT_DOWN = 'b001;
@@ -106,7 +76,15 @@ localparam PIECE_MOVEMENT_LEFT = 'b010;
 localparam PIECE_MOVEMENT_RIGHT = 'b011;
 localparam PIECE_MOVEMENT_UP = 'b100;
 
-reg[4:0] state = STATE_INIT;
+localparam PIECE_OPERATION_NONE = 'b00;
+localparam PIECE_OPERATION_COLLISION_CHECK = 'b01;
+localparam PIECE_OPERATION_WRITE = 'b10;
+localparam PIECE_OPERATION_ERASE = 'b11;
+
+localparam PIECE_NO_COLLISIONS_DETECTED = 'b01;
+localparam PIECE_COLLISION_DETECTED = 'b10;
+
+reg[3:0] state = STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
@@ -127,12 +105,7 @@ reg soft_dropping = 0;
 reg[4:0] are_timer = 0;
 reg[5:0] frames_from_last_fall = 0;
 
-reg[2:0] current_piece_read_index = 0;
-assign current_piece_read_index_out = current_piece_read_index[1:0];
-
 wire[5:0] current_gravity = soft_dropping ? 2 : gravity_by_level(current_level);
-
-reg read_field_delay = 0;
 
 integer init_stage = 0;
 
@@ -170,89 +143,51 @@ always @(posedge clk) begin
             right_prev_state = button_right;
 
             piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+            piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
+
             soft_dropping <= button_down;
 
             // TODO: DAS.
             case ({left_just_pressed, right_just_pressed})
-                'b10: piece_movement <= PIECE_MOVEMENT_LEFT;
-                'b01: piece_movement <= PIECE_MOVEMENT_RIGHT;
+                'b10: begin
+                    piece_movement <= PIECE_MOVEMENT_LEFT;
+                    piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                end
+                'b01: begin
+                    piece_movement <= PIECE_MOVEMENT_RIGHT;
+                    piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                end
+                default: begin
+                    piece_movement <= PIECE_MOVEMENT_NONE;
+                    piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+                end
             endcase
 
-            current_piece_read_index <= 0;
-            state <= STATE_PREPARE_TO_BOUNDS_CHECK;
-        end
-        STATE_PREPARE_TO_BOUNDS_CHECK: begin
-            case (piece_movement)
-                PIECE_MOVEMENT_LEFT: piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
-                PIECE_MOVEMENT_RIGHT: piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
-                default: piece_movement_inverse <= PIECE_MOVEMENT_NONE;
-            endcase
-
-            piece_rotation_inverse <= ~piece_rotation;
-
-            piece_rotation <= 0;
-            piece_movement <= PIECE_MOVEMENT_NONE;
-
-            if(
-                current_piece_read_cell_y <= 2 || 
-                current_piece_read_cell_x <= 2 || 
-                current_piece_read_cell_x >= 13
-            ) begin
-                piece_movement <= piece_movement_inverse;
-                piece_rotation <= piece_rotation_inverse;
-
-                state <= STATE_ARE;
-            end else begin
-                soft_dropping_movement <= 0;
-
-                field_read_enable <= 1;
-                read_field_delay <= 1;
-                field_x <= current_piece_read_cell_x;
-                field_y <= current_piece_read_cell_y;
-                current_piece_read_index <= current_piece_read_index + 1;
-
-                state <= STATE_BOUNDS_CHECK;
-            end
+            start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
+            state <= STATE_BOUNDS_CHECK;
         end
         STATE_BOUNDS_CHECK: begin
-            if(
-                current_piece_read_cell_y <= 2 || 
-                current_piece_read_cell_x <= 2 || 
-                current_piece_read_cell_x >= 13
-            ) begin
-                piece_movement <= piece_movement_inverse;
-                piece_rotation <= piece_rotation_inverse;
-
-                state <= STATE_ARE;
-            end else begin
-                read_field_delay <= ~read_field_delay;
-                if(!read_field_delay) begin
-                    if (current_piece_read_index == 4) begin
-                        if (field_cell_read_value != 'b000) begin   
-                            piece_movement <= piece_movement_inverse;
-                            piece_rotation <= piece_rotation_inverse;
-                        end
+            soft_dropping_movement <= 0;
+            
+            if (start_piece_operation == PIECE_OPERATION_NONE) begin
+                case(piece_operation_result) 
+                    PIECE_COLLISION_DETECTED: begin
+                        piece_movement <= piece_movement_inverse;
+                        piece_rotation <= piece_rotation_inverse;
 
                         state <= STATE_ARE;
-                    end else begin
-                        current_piece_read_index <= current_piece_read_index + 1;
-
-                        field_x <= current_piece_read_cell_x;
-                        field_y <= current_piece_read_cell_y;
-
-                        if (field_cell_read_value != 'b000) begin       
-                            piece_movement <= piece_movement_inverse;
-                            piece_rotation <= piece_rotation_inverse;
-
-                            state <= STATE_ARE;
-                        end
                     end
-                end
+                    PIECE_NO_COLLISIONS_DETECTED: begin
+                        state <= STATE_ARE;
+                    end
+                endcase
+            end else begin
+                piece_rotation <= 0;
+                piece_movement <= PIECE_MOVEMENT_NONE;
+                start_piece_operation <= PIECE_OPERATION_NONE;
             end
         end
         STATE_ARE: begin
-            field_read_enable <= 0;
-
             piece_movement <= 0;
             piece_rotation <= 0;
 
@@ -272,67 +207,35 @@ always @(posedge clk) begin
                 end
 
                 piece_movement <= PIECE_MOVEMENT_DOWN;
-                current_piece_read_index <= 0;
+                start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
                 
-                state <= STATE_PREPARE_TO_SETTLEMENT_CHECK;
+                state <= STATE_SETTLEMENT_CHECK;
             end else begin
                 frames_from_last_fall <= frames_from_last_fall + 1;
                     
-                state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
-            end
-        end
-        STATE_PREPARE_TO_SETTLEMENT_CHECK: begin
-            if(current_piece_read_cell_y <= 2) begin
-                piece_movement <= PIECE_MOVEMENT_UP;
-
-                state <= STATE_SETTLE;
-            end else begin
-                soft_dropping_movement <= 0;
-
-                piece_movement <= PIECE_MOVEMENT_NONE;
-
-                field_read_enable <= 1;
-                read_field_delay <= 1;
-                field_x <= current_piece_read_cell_x;
-                field_y <= current_piece_read_cell_y;
-                current_piece_read_index <= current_piece_read_index + 1;
-
-                state <= STATE_SETTLEMENT_CHECK;
+                start_piece_operation <= PIECE_OPERATION_WRITE;
+                state <= STATE_PUT_PIECE_TO_FIELD;
             end
         end
         STATE_SETTLEMENT_CHECK: begin
-            if(current_piece_read_cell_y <= 2) begin
-                piece_movement <= PIECE_MOVEMENT_UP;
-
-                state <= STATE_SETTLE;
-            end else begin
-                read_field_delay <= ~read_field_delay;
-                if(!read_field_delay) begin
-                    if (current_piece_read_index == 4) begin
-                        if (field_cell_read_value != 'b000) begin
-                            piece_movement <= PIECE_MOVEMENT_UP;
-
-                            state <= STATE_SETTLE;
-                        end else begin
-                            state <= STATE_PREPARE_TO_PUT_PIECE_TO_FIELD;
-                        end
-                    end else begin
-                        current_piece_read_index <= current_piece_read_index + 1;
-
-                        field_x <= current_piece_read_cell_x;
-                        field_y <= current_piece_read_cell_y;
-
-                        if (field_cell_read_value != 'b000) begin
-                            piece_movement <= PIECE_MOVEMENT_UP;
-
-                            state <= STATE_SETTLE;
-                        end
+            if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                case(piece_operation_result) 
+                    PIECE_COLLISION_DETECTED: begin
+                        piece_movement <= PIECE_MOVEMENT_UP;
+                        state <= STATE_SETTLE;
                     end
-                end
+                    PIECE_NO_COLLISIONS_DETECTED: begin
+                        start_piece_operation <= PIECE_OPERATION_WRITE;
+                        state <= STATE_PUT_PIECE_TO_FIELD;
+                    end
+                endcase
+            end else begin
+                start_piece_operation <= PIECE_OPERATION_NONE;
+                soft_dropping_movement <= 0;
+                piece_movement <= PIECE_MOVEMENT_NONE;
             end
         end
         STATE_SETTLE: begin
-            field_read_enable <= 0;
             piece_movement <= PIECE_MOVEMENT_NONE;
 
             are_timer <= are_by_piece_position(current_piece_center_y);
@@ -342,32 +245,19 @@ always @(posedge clk) begin
             end
             soft_dropping <= 0;
 
-            current_piece_read_index <= 0;
-
-            state <= STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD;
-        end
-        STATE_PREPARE_TO_WRITE_PIECE_TO_FIELD: begin
-            commit_soft_drop_score <= 0;
-
-            field_cell_write_value <= current_piece_type;
-            field_write_enable <= 1;
-            field_x <= current_piece_read_cell_x;
-            field_y <= current_piece_read_cell_y;
-            current_piece_read_index <= 0;
+            start_piece_operation <= PIECE_OPERATION_WRITE;
 
             state <= STATE_WRITE_PIECE_TO_FIELD;
         end
         STATE_WRITE_PIECE_TO_FIELD: begin
-            if (current_piece_read_index == 4) begin
-                field_write_enable <= 0;
-                start_burn <= 1;
-
-                state <= STATE_BURNING;
+            if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                if (piece_operation_result != 0) begin
+                    start_burn <= 1;
+                    state <= STATE_BURNING;
+                end
             end else begin
-                current_piece_read_index <= current_piece_read_index + 1;
-
-                field_x <= current_piece_read_cell_x;
-                field_y <= current_piece_read_cell_y;
+                start_piece_operation <= PIECE_OPERATION_NONE;
+                commit_soft_drop_score <= 0;
             end
         end
         STATE_BURNING: begin
@@ -393,26 +283,17 @@ always @(posedge clk) begin
                 state <= STATE_RENDER;
             end
         end
-        STATE_PREPARE_TO_PUT_PIECE_TO_FIELD: begin
-            current_piece_read_index <= 0;
-            field_cell_write_value <= current_piece_type;
-
-            state <= STATE_PUT_PIECE_TO_FIELD;
-        end
         STATE_PUT_PIECE_TO_FIELD: begin
-            field_x <= current_piece_read_cell_x;
-            field_y <= current_piece_read_cell_y;
-            field_write_enable <= 1;
-
-            if (current_piece_read_index == 3) begin                
-                state <= STATE_RENDER;
+            if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                if (piece_operation_result != 0) begin
+                    state <= STATE_RENDER;
+                end
             end else begin
-                current_piece_read_index <= current_piece_read_index + 1;
+                start_piece_operation <= PIECE_OPERATION_NONE;
             end
         end
         STATE_RENDER: begin
             reset_scores <= 0;
-            field_write_enable <= 0;
 
             // TODO: Implement rendering later.
 
@@ -420,26 +301,20 @@ always @(posedge clk) begin
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
                 current_frame_duration <= 0;    
 
-                current_piece_read_index <= 0;
-                field_cell_write_value <= 'b000;
-
+                start_piece_operation <= PIECE_OPERATION_ERASE;
                 state <= STATE_REMOVE_PIECE_FROM_FIELD;  
             end
         end
         STATE_REMOVE_PIECE_FROM_FIELD: begin
-            field_x <= current_piece_read_cell_x;
-            field_y <= current_piece_read_cell_y;
-            field_write_enable <= 1;
-
-            if (current_piece_read_index == 3) begin                
-                state <= STATE_PADDING;
+            if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                if (piece_operation_result != 0) begin
+                    state <= STATE_PADDING;
+                end
             end else begin
-                current_piece_read_index <= current_piece_read_index + 1;
+                start_piece_operation <= PIECE_OPERATION_NONE;
             end
         end
         STATE_PADDING: begin
-            field_write_enable <= 0;
-
             //if (current_frame_duration == CLK_PER_FRAME - 1) begin
             //    current_frame_duration <= 0;    
                 state <= STATE_PROCESSING_INPUT;   
