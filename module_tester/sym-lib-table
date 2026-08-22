@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "PCI-E X4 Socket") (type "KiCad") (uri "${KIPRJMOD}/PCI-E socket/PCI-E X4 Socket.kicad_sym") (options "") (descr ""))
+)
