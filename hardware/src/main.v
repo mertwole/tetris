@@ -364,7 +364,9 @@ module main (
     .button_left(button_left_pressed),
     .button_down(button_down_pressed),
     .button_right(button_right_pressed),
-    
+
+    .button_start(button_start_pressed),
+
     .current_level(current_level),
 
     .piece_movement(piece_movement),

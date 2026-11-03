@@ -35,7 +35,7 @@ module io(
 
 assign game_state_leds = game_state_to_leds(game_state);
 
-function [3:0] game_state_to_leds(input game_state[1:0]);
+function [3:0] game_state_to_leds(input[1:0] game_state);
     case(game_state)
         'b00: game_state_to_leds = 'b1000;
         'b01: game_state_to_leds = 'b0100;

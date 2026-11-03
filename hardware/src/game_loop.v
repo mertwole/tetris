@@ -99,12 +99,10 @@ localparam GAME_STATE_PLAY = 'b01;
 localparam GAME_STATE_PAUSE = 'b10;
 localparam GAME_STATE_GAME_OVER = 'b11;
 
-reg[1:0] state = STATE_INIT;
+reg[3:0] state = STATE_INIT;
 
 reg[1:0] game_state = GAME_STATE_INIT;
 assign game_state_out = game_state;
-
-reg[3:0] state = STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
