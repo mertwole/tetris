@@ -49,7 +49,7 @@ module game_loop(
     output reg commit_soft_drop_score = 0,
 
     // Reset all the scores.
-    output reg reset_scores = 0,
+    output wire reset_scores,
 
     // The current game state.
     //
@@ -103,6 +103,8 @@ reg[3:0] state = STATE_INIT;
 
 reg[1:0] game_state = GAME_STATE_INIT;
 assign game_state_out = game_state;
+
+assign reset_scores = game_state == GAME_STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
@@ -315,7 +317,7 @@ always @(posedge clk) begin
 
             if(!start_lose_check && (lose_result != 0)) begin
                 if (lose_result == 'b10) begin
-                    reset_scores <= 1;
+                    game_state <= GAME_STATE_GAME_OVER;
                 end
 
                 state <= STATE_RENDER;
@@ -331,8 +333,6 @@ always @(posedge clk) begin
             end
         end
         STATE_RENDER: begin
-            reset_scores <= 0;
-
             // TODO: Implement rendering later.
 
             // TODO: Move this condition to the `STATE_PADDING`.
