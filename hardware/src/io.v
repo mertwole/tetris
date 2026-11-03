@@ -33,14 +33,19 @@ module io(
     output wire button_left_pressed
 );
 
+localparam GAME_STATE_INIT = 'b00;
+localparam GAME_STATE_PLAY = 'b01;
+localparam GAME_STATE_PAUSE = 'b10;
+localparam GAME_STATE_GAME_OVER = 'b11;
+
 assign game_state_leds = game_state_to_leds(game_state);
 
 function [3:0] game_state_to_leds(input[1:0] game_state);
     case(game_state)
-        'b00: game_state_to_leds = 'b1000;
-        'b01: game_state_to_leds = 'b0100;
-        'b10: game_state_to_leds = 'b0010;
-        'b11: game_state_to_leds = 'b0001;
+        GAME_STATE_INIT: game_state_to_leds = 'b1000;
+        GAME_STATE_PLAY: game_state_to_leds = 'b0100;
+        GAME_STATE_PAUSE: game_state_to_leds = 'b0010;
+        GAME_STATE_GAME_OVER: game_state_to_leds = 'b0001;
     endcase
 endfunction
 
@@ -157,7 +162,7 @@ always @(posedge clk) begin
         next_piece_read_stage <= 0;
 
         next_piece_leds_buffer <= 0;
-        if (next_piece_type == 'b000) begin
+        if (next_piece_type == 'b000 || game_state == GAME_STATE_GAME_OVER || game_state == GAME_STATE_INIT) begin
             next_piece_leds <= 0;
         end else begin
             next_piece_leds <= next_piece_leds_buffer;

@@ -173,9 +173,7 @@ always @(posedge clk) begin
                     GAME_STATE_GAME_OVER: game_state <= GAME_STATE_INIT;
                 endcase
 
-                // TODO: Set `start_piece_operation` inside of the corresponding case branch.
-                start_piece_operation <= PIECE_OPERATION_WRITE;
-                state <= STATE_PUT_PIECE_TO_FIELD;
+                state <= STATE_RENDER;
             end else if(game_state == GAME_STATE_PLAY) begin
                 piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
                 piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
@@ -200,10 +198,13 @@ always @(posedge clk) begin
 
                 start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
                 state <= STATE_BOUNDS_CHECK;
-            end else begin 
-                // TODO: Set `start_piece_operation` inside of the corresponding case branch.
-                start_piece_operation <= PIECE_OPERATION_WRITE;
-                state <= STATE_PUT_PIECE_TO_FIELD;
+            end else begin
+                if (game_state == GAME_STATE_PAUSE) begin
+                    start_piece_operation <= PIECE_OPERATION_WRITE;
+                    state <= STATE_PUT_PIECE_TO_FIELD;
+                end else begin
+                    state <= STATE_RENDER;
+                end
             end
         end
         STATE_BOUNDS_CHECK: begin
