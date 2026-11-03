@@ -23,7 +23,7 @@ module io(
     input wire next_piece_cell_y,
     input wire[2:0] next_piece_type,
 
-    input wire[3:0] game_state,
+    input wire[1:0] game_state,
 
     output wire button_start_pressed,
     output wire button_rotate_cw_pressed,
@@ -33,7 +33,16 @@ module io(
     output wire button_left_pressed
 );
 
-assign game_state_leds = game_state;
+assign game_state_leds = game_state_to_leds(game_state);
+
+function [3:0] game_state_to_leds(input game_state[1:0]);
+    case(game_state)
+        'b00: game_state_to_leds = 'b1000;
+        'b01: game_state_to_leds = 'b0100;
+        'b10: game_state_to_leds = 'b0010;
+        'b11: game_state_to_leds = 'b0001;
+    endcase
+endfunction
 
 integer digit_switch_counter = 0;
 
