@@ -11,6 +11,8 @@ module game_loop(
     input wire button_right,
     // Button for soft drop activation.
     input wire button_down,
+    // A button that may start, stop or pause the game.
+    input wire button_start,
 
     // A current level.
     input wire[4:0] current_level,
@@ -47,7 +49,15 @@ module game_loop(
     output reg commit_soft_drop_score = 0,
 
     // Reset all the scores.
-    output reg reset_scores = 0,
+    output wire reset_scores,
+
+    // The current game state.
+    //
+    // 'b00 - initial
+    // 'b01 - playing
+    // 'b10 - paused
+    // 'b11 - game over
+    output wire[1:0] game_state_out,
 
     // Start an operation on the current piece.
     output reg[1:0] start_piece_operation,
@@ -84,15 +94,27 @@ localparam PIECE_OPERATION_ERASE = 'b11;
 localparam PIECE_NO_COLLISIONS_DETECTED = 'b01;
 localparam PIECE_COLLISION_DETECTED = 'b10;
 
+localparam GAME_STATE_INIT = 'b00;
+localparam GAME_STATE_PLAY = 'b01;
+localparam GAME_STATE_PAUSE = 'b10;
+localparam GAME_STATE_GAME_OVER = 'b11;
+
 reg[3:0] state = STATE_INIT;
+
+reg[1:0] game_state = GAME_STATE_INIT;
+assign game_state_out = game_state;
+
+assign reset_scores = game_state == GAME_STATE_INIT;
 
 reg rotate_cw_prev_state = 0;
 reg rotate_ccw_prev_state = 0;
 reg left_prev_state = 0;
 reg right_prev_state = 0;
+reg start_prev_state = 0;
 
 wire rotate_cw_just_pressed = button_rotate_cw & !rotate_cw_prev_state;
 wire rotate_ccw_just_pressed = button_rotate_ccw & !rotate_ccw_prev_state;
+wire start_just_pressed = button_start & !start_prev_state;
 
 wire left_just_pressed = button_left & !left_prev_state;
 wire right_just_pressed = button_right & !right_prev_state;
@@ -141,30 +163,49 @@ always @(posedge clk) begin
             rotate_ccw_prev_state = button_rotate_ccw;
             left_prev_state = button_left;
             right_prev_state = button_right;
+            start_prev_state = button_start;
 
-            piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
-            piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
+            if (start_just_pressed) begin
+                case (game_state) 
+                    GAME_STATE_INIT: game_state <= GAME_STATE_PLAY;
+                    GAME_STATE_PLAY: game_state <= GAME_STATE_PAUSE;
+                    GAME_STATE_PAUSE: game_state <= GAME_STATE_PLAY;
+                    GAME_STATE_GAME_OVER: game_state <= GAME_STATE_INIT;
+                endcase
 
-            soft_dropping <= button_down;
+                state <= STATE_RENDER;
+            end else if(game_state == GAME_STATE_PLAY) begin
+                piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+                piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
 
-            // TODO: DAS.
-            case ({left_just_pressed, right_just_pressed})
-                'b10: begin
-                    piece_movement <= PIECE_MOVEMENT_LEFT;
-                    piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                soft_dropping <= button_down;
+
+                // TODO: DAS.
+                case ({left_just_pressed, right_just_pressed})
+                    'b10: begin
+                        piece_movement <= PIECE_MOVEMENT_LEFT;
+                        piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                    end
+                    'b01: begin
+                        piece_movement <= PIECE_MOVEMENT_RIGHT;
+                        piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                    end
+                    default: begin
+                        piece_movement <= PIECE_MOVEMENT_NONE;
+                        piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+                    end
+                endcase
+
+                start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
+                state <= STATE_BOUNDS_CHECK;
+            end else begin
+                if (game_state == GAME_STATE_PAUSE) begin
+                    start_piece_operation <= PIECE_OPERATION_WRITE;
+                    state <= STATE_PUT_PIECE_TO_FIELD;
+                end else begin
+                    state <= STATE_RENDER;
                 end
-                'b01: begin
-                    piece_movement <= PIECE_MOVEMENT_RIGHT;
-                    piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
-                end
-                default: begin
-                    piece_movement <= PIECE_MOVEMENT_NONE;
-                    piece_movement_inverse <= PIECE_MOVEMENT_NONE;
-                end
-            endcase
-
-            start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
-            state <= STATE_BOUNDS_CHECK;
+            end
         end
         STATE_BOUNDS_CHECK: begin
             soft_dropping_movement <= 0;
@@ -277,7 +318,7 @@ always @(posedge clk) begin
 
             if(!start_lose_check && (lose_result != 0)) begin
                 if (lose_result == 'b10) begin
-                    reset_scores <= 1;
+                    game_state <= GAME_STATE_GAME_OVER;
                 end
 
                 state <= STATE_RENDER;
@@ -293,13 +334,14 @@ always @(posedge clk) begin
             end
         end
         STATE_RENDER: begin
-            reset_scores <= 0;
-
             // TODO: Implement rendering later.
 
             // TODO: Move this condition to the `STATE_PADDING`.
+            // This delay is here because we're stopping state changes in a state where the current piece 
+            // is written to the field, so the renderer which works async have the biggest chance of seeing
+            // the field in the appropriate state.
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
-                current_frame_duration <= 0;    
+                current_frame_duration <= 0;
 
                 start_piece_operation <= PIECE_OPERATION_ERASE;
                 state <= STATE_REMOVE_PIECE_FROM_FIELD;  

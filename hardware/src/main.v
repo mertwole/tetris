@@ -141,6 +141,8 @@ module main (
   wire button_rotate_cw_pressed;
   wire button_rotate_ccw_pressed;
 
+  wire[1:0] game_state;
+
   io io_inst(
     .clk(clk1x),
 
@@ -173,7 +175,7 @@ module main (
     .next_piece_cell_y(next_piece_cell_y),
     .next_piece_type(next_piece_type),
 
-    .game_state('b0101)
+    .game_state(game_state)
   );
 
   wire generate_next_piece;
@@ -362,7 +364,9 @@ module main (
     .button_left(button_left_pressed),
     .button_down(button_down_pressed),
     .button_right(button_right_pressed),
-    
+
+    .button_start(button_start_pressed),
+
     .current_level(current_level),
 
     .piece_movement(piece_movement),
@@ -384,6 +388,8 @@ module main (
     .commit_soft_drop_score(commit_soft_drop_score),
 
     .reset_scores(reset_scores),
+
+    .game_state_out(game_state),
 
     .start_piece_operation(start_piece_operation_game_loop),
     .piece_operation_result(piece_operation_result)
