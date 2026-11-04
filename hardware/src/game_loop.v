@@ -99,6 +99,11 @@ localparam GAME_STATE_PLAY = 'b01;
 localparam GAME_STATE_PAUSE = 'b10;
 localparam GAME_STATE_GAME_OVER = 'b11;
 
+localparam INITIAL_DAS_DELAY = 16;
+localparam REPEATED_DAS_DELAY = 6;
+localparam DAS_DIRECTION_LEFT = 0;
+localparam DAS_DIRECTION_RIGHT = 1;
+
 reg[3:0] state = STATE_INIT;
 
 reg[1:0] game_state = GAME_STATE_INIT;
@@ -119,6 +124,9 @@ wire start_just_pressed = button_start & !start_prev_state;
 wire left_just_pressed = button_left & !left_prev_state;
 wire right_just_pressed = button_right & !right_prev_state;
 
+wire left_just_released = !button_left & left_prev_state;
+wire right_just_released = !button_right & right_prev_state;
+
 localparam CLK_PER_FRAME = 1_000_000;
 
 integer current_frame_duration = 0;
@@ -133,6 +141,9 @@ integer init_stage = 0;
 
 reg[2:0] piece_movement_inverse = 0;
 reg[1:0] piece_rotation_inverse = 0;
+
+reg[3:0] das_delay = INITIAL_DAS_DELAY;
+reg das_direction = 0;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -180,21 +191,46 @@ always @(posedge clk) begin
 
                 soft_dropping <= button_down;
 
-                // TODO: DAS.
-                case ({left_just_pressed, right_just_pressed})
-                    'b10: begin
-                        piece_movement <= PIECE_MOVEMENT_LEFT;
-                        piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                if(
+                    (das_direction == DAS_DIRECTION_LEFT && button_left) || 
+                    (das_direction == DAS_DIRECTION_RIGHT && button_right)
+                ) begin
+                    if (das_delay == 0) begin
+                        das_delay <= REPEATED_DAS_DELAY;
+
+                        case (das_direction)
+                            DAS_DIRECTION_LEFT: begin
+                                piece_movement <= PIECE_MOVEMENT_LEFT;
+                                piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                            end
+                            DAS_DIRECTION_RIGHT: begin
+                                piece_movement <= PIECE_MOVEMENT_RIGHT;
+                                piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                            end
+                        endcase
+                    end else begin
+                        das_delay <= das_delay - 1;
                     end
-                    'b01: begin
-                        piece_movement <= PIECE_MOVEMENT_RIGHT;
-                        piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
-                    end
-                    default: begin
-                        piece_movement <= PIECE_MOVEMENT_NONE;
-                        piece_movement_inverse <= PIECE_MOVEMENT_NONE;
-                    end
-                endcase
+                end else begin
+                    das_delay <= INITIAL_DAS_DELAY;
+
+                    case ({left_just_pressed, right_just_pressed})
+                        'b10: begin
+                            das_direction <= DAS_DIRECTION_LEFT;
+                            piece_movement <= PIECE_MOVEMENT_LEFT;
+                            piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                        end
+                        'b01: begin
+                            das_direction <= DAS_DIRECTION_RIGHT;
+                            piece_movement <= PIECE_MOVEMENT_RIGHT;
+                            piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                        end
+                        default: begin
+                            piece_movement <= PIECE_MOVEMENT_NONE;
+                            piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+                        end
+                    endcase
+                end
 
                 start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
                 state <= STATE_BOUNDS_CHECK;
