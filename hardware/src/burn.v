@@ -47,8 +47,9 @@ localparam STATE_IDLE = 'b000;
 localparam STATE_SCANNING = 'b001;
 localparam STATE_PREPARE_TO_BURN = 'b010;
 localparam STATE_BURNING = 'b011;
-localparam STATE_PREPARE_TO_FALL = 'b100;
-localparam STATE_FALLING = 'b101;
+localparam STATE_PLAYING_ANIMATION = 'b100;
+localparam STATE_PREPARE_TO_FALL = 'b101;
+localparam STATE_FALLING = 'b110;
 
 localparam RESULT_IN_PROGRESS = 'b00;
 localparam RESULT_ANIMATION_FRAME_DONE = 'b01;
@@ -119,26 +120,41 @@ always @(posedge clk) begin
                 result <= RESULT_DONE;
                 state <= STATE_IDLE;
             end else begin
-                field_x <= 3;
+                field_x <= 3 - 1; // Will be incremented on the first iteration of `STATE_BURNING`.
                 state <= STATE_BURNING;
             end
         end
-        STATE_BURNING: begin // TODO: Play animation.
+        STATE_BURNING: begin
             field_y <= lines_to_burn[currently_burning_y];
 
-            if (currently_burning_y + 1 == amount_of_lines_to_burn) begin
+            if (currently_burning_y == 0) begin
                 field_x <= field_x + 1;
-                currently_burning_y <= 0;
+            end
 
+            if (currently_burning_y + 1 == amount_of_lines_to_burn) begin
+                currently_burning_y <= 0;
+                
                 if (field_x == 12) begin
-                    field_write_enable <= 0;
                     state <= STATE_PREPARE_TO_FALL;
-                end else begin
+
+                    field_write_enable <= 0;
+                end else begin                    
+                    state <= STATE_PLAYING_ANIMATION;
+                    result <= RESULT_ANIMATION_FRAME_DONE;
+
                     field_write_enable <= 1;
                 end
             end else begin
                 currently_burning_y <= currently_burning_y + 1;
                 field_write_enable <= 1;
+            end
+        end
+        STATE_PLAYING_ANIMATION: begin
+            field_write_enable <= 0;
+
+            if (start) begin
+                result <= RESULT_IN_PROGRESS;
+                state <= STATE_BURNING;
             end
         end
         STATE_PREPARE_TO_FALL: begin

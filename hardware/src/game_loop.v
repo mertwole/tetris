@@ -398,9 +398,13 @@ always @(posedge clk) begin
             // the field in the appropriate state.
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
                 current_frame_duration <= 0;
-
-                start_piece_operation <= PIECE_OPERATION_ERASE;
-                state <= STATE_REMOVE_PIECE_FROM_FIELD;  
+                
+                if (animating_burn) begin
+                    state <= STATE_PADDING;
+                end else begin
+                    start_piece_operation <= PIECE_OPERATION_ERASE;
+                    state <= STATE_REMOVE_PIECE_FROM_FIELD;  
+                end
             end
         end
         STATE_REMOVE_PIECE_FROM_FIELD: begin
