@@ -30,8 +30,8 @@ module game_loop(
 
     // Start processing the burn.
     output reg start_burn = 0,
-    // Signalizes that the burn has completed.
-    input wire burn_done,
+    // Result of the started burn operation.
+    input wire[1:0] burn_result,
 
     // Start checking for lose.
     output reg start_lose_check = 0,
@@ -104,6 +104,10 @@ localparam REPEATED_DAS_DELAY = 6;
 localparam DAS_DIRECTION_LEFT = 0;
 localparam DAS_DIRECTION_RIGHT = 1;
 
+localparam BURN_RESULT_IN_PROGRESS = 'b00;
+localparam BURN_RESULT_ANIMATION_FRAME_DONE = 'b01;
+localparam BURN_RESULT_DONE = 'b11;
+
 reg[3:0] state = STATE_INIT;
 
 reg[1:0] game_state = GAME_STATE_INIT;
@@ -144,6 +148,8 @@ reg[1:0] piece_rotation_inverse = 0;
 
 reg[3:0] das_delay = INITIAL_DAS_DELAY;
 reg das_direction = 0;
+
+reg animating_burn = 0;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -186,54 +192,59 @@ always @(posedge clk) begin
 
                 state <= STATE_RENDER;
             end else if(game_state == GAME_STATE_PLAY) begin
-                piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
-                piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
+                if (animating_burn) begin
+                    start_burn <= 1;
+                    state <= STATE_BURNING;
+                end else begin
+                    piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+                    piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
 
-                soft_dropping <= button_down;
+                    soft_dropping <= button_down;
 
-                if(
-                    (das_direction == DAS_DIRECTION_LEFT && button_left) || 
-                    (das_direction == DAS_DIRECTION_RIGHT && button_right)
-                ) begin
-                    if (das_delay == 0) begin
-                        das_delay <= REPEATED_DAS_DELAY;
+                    if(
+                        (das_direction == DAS_DIRECTION_LEFT && button_left) || 
+                        (das_direction == DAS_DIRECTION_RIGHT && button_right)
+                    ) begin
+                        if (das_delay == 0) begin
+                            das_delay <= REPEATED_DAS_DELAY;
 
-                        case (das_direction)
-                            DAS_DIRECTION_LEFT: begin
+                            case (das_direction)
+                                DAS_DIRECTION_LEFT: begin
+                                    piece_movement <= PIECE_MOVEMENT_LEFT;
+                                    piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                                end
+                                DAS_DIRECTION_RIGHT: begin
+                                    piece_movement <= PIECE_MOVEMENT_RIGHT;
+                                    piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                                end
+                            endcase
+                        end else begin
+                            das_delay <= das_delay - 1;
+                        end
+                    end else begin
+                        das_delay <= INITIAL_DAS_DELAY;
+
+                        case ({left_just_pressed, right_just_pressed})
+                            'b10: begin
+                                das_direction <= DAS_DIRECTION_LEFT;
                                 piece_movement <= PIECE_MOVEMENT_LEFT;
                                 piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
                             end
-                            DAS_DIRECTION_RIGHT: begin
+                            'b01: begin
+                                das_direction <= DAS_DIRECTION_RIGHT;
                                 piece_movement <= PIECE_MOVEMENT_RIGHT;
                                 piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
                             end
+                            default: begin
+                                piece_movement <= PIECE_MOVEMENT_NONE;
+                                piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+                            end
                         endcase
-                    end else begin
-                        das_delay <= das_delay - 1;
                     end
-                end else begin
-                    das_delay <= INITIAL_DAS_DELAY;
 
-                    case ({left_just_pressed, right_just_pressed})
-                        'b10: begin
-                            das_direction <= DAS_DIRECTION_LEFT;
-                            piece_movement <= PIECE_MOVEMENT_LEFT;
-                            piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
-                        end
-                        'b01: begin
-                            das_direction <= DAS_DIRECTION_RIGHT;
-                            piece_movement <= PIECE_MOVEMENT_RIGHT;
-                            piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
-                        end
-                        default: begin
-                            piece_movement <= PIECE_MOVEMENT_NONE;
-                            piece_movement_inverse <= PIECE_MOVEMENT_NONE;
-                        end
-                    endcase
+                    start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
+                    state <= STATE_BOUNDS_CHECK;
                 end
-
-                start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
-                state <= STATE_BOUNDS_CHECK;
             end else begin
                 if (game_state == GAME_STATE_PAUSE) begin
                     start_piece_operation <= PIECE_OPERATION_WRITE;
@@ -340,12 +351,21 @@ always @(posedge clk) begin
         STATE_BURNING: begin
             start_burn <= 0;
 
-            if (!start_burn && burn_done) begin
-                generate_new_piece <= 1;
-                frames_from_last_fall <= 0;
-                start_lose_check <= 1;
+            if (!start_burn) begin
+                case(burn_result)
+                    BURN_RESULT_DONE: begin
+                        generate_new_piece <= 1;
+                        frames_from_last_fall <= 0;
+                        start_lose_check <= 1;
+                        animating_burn <= 0;
 
-                state <= STATE_CHECK_LOSE;
+                        state <= STATE_CHECK_LOSE;
+                    end
+                    BURN_RESULT_ANIMATION_FRAME_DONE: begin
+                        animating_burn <= 1;
+                        state <= STATE_RENDER;
+                    end
+                endcase
             end
         end
         STATE_CHECK_LOSE: begin

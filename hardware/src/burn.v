@@ -3,8 +3,12 @@ module burn (
 
     // Start checking the complete lines and playing the burn animation.
     input wire start,
-    // Asserted when all the burn-related operations are complete.
-    output wire done,
+    // A result of the burn operation.
+    //
+    // 'b00 - operation is in progress
+    // 'b01 - animation frame done
+    // 'b10 - complete
+    output reg[1:0] result = 'b10,
 
     // X coordinate of the field cell, used for both read and write operations.
     output reg[3:0] field_x = 3,
@@ -46,9 +50,11 @@ localparam STATE_BURNING = 'b011;
 localparam STATE_PREPARE_TO_FALL = 'b100;
 localparam STATE_FALLING = 'b101;
 
-reg[2:0] state = STATE_IDLE;
+localparam RESULT_IN_PROGRESS = 'b00;
+localparam RESULT_ANIMATION_FRAME_DONE = 'b01;
+localparam RESULT_DONE = 'b11;
 
-assign done = state == STATE_IDLE;
+reg[2:0] state = STATE_IDLE;
 
 reg is_current_line_complete = 1;
 
@@ -73,6 +79,7 @@ always @(posedge clk) begin
                 amount_of_lines_to_burn <= 0;
                 currently_burning_y <= 0;
 
+                result <= RESULT_IN_PROGRESS;
                 state <= STATE_SCANNING;
             end
         end
@@ -109,6 +116,7 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_BURN: begin
             if (amount_of_lines_to_burn == 0) begin
+                result <= RESULT_DONE;
                 state <= STATE_IDLE;
             end else begin
                 field_x <= 3;
@@ -164,6 +172,7 @@ always @(posedge clk) begin
                         if (amount_of_lines_to_burn == 1) begin
                             commit_burned_lines <= 1;
 
+                            result <= RESULT_DONE;
                             state <= STATE_IDLE;
                         end else begin
                             // NOTE: `amount_of_lines_to_burn` counter is reused here.

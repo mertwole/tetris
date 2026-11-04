@@ -240,7 +240,7 @@ module main (
   );
 
   wire start_burn;
-  wire burn_done;
+  wire [1:0] burn_result;
 
   wire burn_field_read_enable;
   wire burn_field_write_enable;
@@ -257,7 +257,7 @@ module main (
     .clk(clk1x),
 
     .start(start_burn),
-    .done(burn_done),
+    .result(burn_result),
 
     .field_x(burn_field_x),
     .field_y(burn_field_y),
@@ -376,7 +376,7 @@ module main (
     .current_piece_type(current_piece_type),
 
     .start_burn(start_burn),
-    .burn_done(burn_done),
+    .burn_result(burn_result),
 
     .start_lose_check(start_lose),
     .lose_result(lose_result),
