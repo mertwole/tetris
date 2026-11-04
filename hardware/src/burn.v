@@ -3,8 +3,12 @@ module burn (
 
     // Start checking the complete lines and playing the burn animation.
     input wire start,
-    // Asserted when all the burn-related operations are complete.
-    output wire done,
+    // A result of the burn operation.
+    //
+    // 'b00 - operation is in progress
+    // 'b01 - animation frame done
+    // 'b10 - complete
+    output reg[1:0] result = 'b10,
 
     // X coordinate of the field cell, used for both read and write operations.
     output reg[3:0] field_x = 3,
@@ -43,12 +47,15 @@ localparam STATE_IDLE = 'b000;
 localparam STATE_SCANNING = 'b001;
 localparam STATE_PREPARE_TO_BURN = 'b010;
 localparam STATE_BURNING = 'b011;
-localparam STATE_PREPARE_TO_FALL = 'b100;
-localparam STATE_FALLING = 'b101;
+localparam STATE_PLAYING_ANIMATION = 'b100;
+localparam STATE_PREPARE_TO_FALL = 'b101;
+localparam STATE_FALLING = 'b110;
+
+localparam RESULT_IN_PROGRESS = 'b00;
+localparam RESULT_ANIMATION_FRAME_DONE = 'b01;
+localparam RESULT_DONE = 'b11;
 
 reg[2:0] state = STATE_IDLE;
-
-assign done = state == STATE_IDLE;
 
 reg is_current_line_complete = 1;
 
@@ -73,6 +80,7 @@ always @(posedge clk) begin
                 amount_of_lines_to_burn <= 0;
                 currently_burning_y <= 0;
 
+                result <= RESULT_IN_PROGRESS;
                 state <= STATE_SCANNING;
             end
         end
@@ -109,28 +117,44 @@ always @(posedge clk) begin
         end
         STATE_PREPARE_TO_BURN: begin
             if (amount_of_lines_to_burn == 0) begin
+                result <= RESULT_DONE;
                 state <= STATE_IDLE;
             end else begin
-                field_x <= 3;
+                field_x <= 3 - 1; // Will be incremented on the first iteration of `STATE_BURNING`.
                 state <= STATE_BURNING;
             end
         end
-        STATE_BURNING: begin // TODO: Play animation.
+        STATE_BURNING: begin
             field_y <= lines_to_burn[currently_burning_y];
 
-            if (currently_burning_y + 1 == amount_of_lines_to_burn) begin
+            if (currently_burning_y == 0) begin
                 field_x <= field_x + 1;
-                currently_burning_y <= 0;
+            end
 
+            if (currently_burning_y + 1 == amount_of_lines_to_burn) begin
+                currently_burning_y <= 0;
+                
                 if (field_x == 12) begin
-                    field_write_enable <= 0;
                     state <= STATE_PREPARE_TO_FALL;
-                end else begin
+
+                    field_write_enable <= 0;
+                end else begin                    
+                    state <= STATE_PLAYING_ANIMATION;
+                    result <= RESULT_ANIMATION_FRAME_DONE;
+
                     field_write_enable <= 1;
                 end
             end else begin
                 currently_burning_y <= currently_burning_y + 1;
                 field_write_enable <= 1;
+            end
+        end
+        STATE_PLAYING_ANIMATION: begin
+            field_write_enable <= 0;
+
+            if (start) begin
+                result <= RESULT_IN_PROGRESS;
+                state <= STATE_BURNING;
             end
         end
         STATE_PREPARE_TO_FALL: begin
@@ -164,6 +188,7 @@ always @(posedge clk) begin
                         if (amount_of_lines_to_burn == 1) begin
                             commit_burned_lines <= 1;
 
+                            result <= RESULT_DONE;
                             state <= STATE_IDLE;
                         end else begin
                             // NOTE: `amount_of_lines_to_burn` counter is reused here.
