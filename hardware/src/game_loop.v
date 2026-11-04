@@ -108,6 +108,11 @@ localparam BURN_RESULT_IN_PROGRESS = 'b00;
 localparam BURN_RESULT_ANIMATION_FRAME_DONE = 'b01;
 localparam BURN_RESULT_DONE = 'b11;
 
+localparam LOSE_RESULT_NOT_COMPLETE = 'b00;
+localparam LOSE_RESULT_NEGATIVE = 'b01;
+localparam LOSE_RESULT_POSITIVE = 'b10;
+localparam LOSE_RESULT_ANIMATION_FRAME_DONE = 'b11;
+
 reg[3:0] state = STATE_INIT;
 
 reg[1:0] game_state = GAME_STATE_INIT;
@@ -150,6 +155,7 @@ reg[3:0] das_delay = INITIAL_DAS_DELAY;
 reg das_direction = 0;
 
 reg animating_burn = 0;
+reg animating_lose = 0;
 
 always @(posedge clk) begin
     current_frame_duration <= current_frame_duration + 1;
@@ -195,6 +201,9 @@ always @(posedge clk) begin
                 if (animating_burn) begin
                     start_burn <= 1;
                     state <= STATE_BURNING;
+                end else if(animating_lose) begin
+                    start_lose_check <= 1;
+                    state <= STATE_CHECK_LOSE;
                 end else begin
                     piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
                     piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
@@ -372,10 +381,12 @@ always @(posedge clk) begin
             generate_new_piece <= 0;
             start_lose_check <= 0;
 
-            if(!start_lose_check && (lose_result != 0)) begin
-                if (lose_result == 'b10) begin
+            if(!start_lose_check && (lose_result != LOSE_RESULT_NOT_COMPLETE)) begin
+                if(lose_result == LOSE_RESULT_POSITIVE) begin
                     game_state <= GAME_STATE_GAME_OVER;
                 end
+
+                animating_lose <= lose_result == LOSE_RESULT_ANIMATION_FRAME_DONE;
 
                 state <= STATE_RENDER;
             end
@@ -399,7 +410,7 @@ always @(posedge clk) begin
             if (current_frame_duration == CLK_PER_FRAME - 1) begin
                 current_frame_duration <= 0;
                 
-                if (animating_burn) begin
+                if (animating_burn || animating_lose) begin
                     state <= STATE_PADDING;
                 end else begin
                     start_piece_operation <= PIECE_OPERATION_ERASE;

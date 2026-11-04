@@ -5,9 +5,10 @@ module lose(
     input wire start,
     // Result of the lose check.
     //
-    // 'b00 - check is not yet complete.
+    // 'b00 - check is not yet complete
     // 'b01 - check is negative
     // 'b10 - check is positive
+    // 'b11 - animation frame done
     output reg[1:0] result,
 
     // X coordinate of the field cell, used for both read and write operations.
@@ -28,10 +29,11 @@ module lose(
     input wire[1:0] piece_operation_result
 );
 
-localparam STATE_IDLE = 'b00;
-localparam STATE_SCANNING = 'b01;
-localparam STATE_PREPARE_TO_ANIMATE = 'b10;
-localparam STATE_ANIMATING = 'b11;
+localparam STATE_IDLE = 'b000;
+localparam STATE_SCANNING = 'b001;
+localparam STATE_PREPARE_TO_ANIMATE = 'b010;
+localparam STATE_ANIMATING = 'b011;
+localparam STATE_ANIMATING_INTERRUPTED = 'b100;
 
 localparam PIECE_OPERATION_NONE = 'b00;
 localparam PIECE_OPERATION_COLLISION_CHECK = 'b01;
@@ -39,7 +41,12 @@ localparam PIECE_OPERATION_COLLISION_CHECK = 'b01;
 localparam PIECE_NO_COLLISIONS_DETECTED = 'b01;
 localparam PIECE_COLLISION_DETECTED = 'b10;
 
-reg[1:0] state = STATE_IDLE;
+localparam RESULT_NOT_COMPLETE = 'b00;
+localparam RESULT_NEGATIVE = 'b01;
+localparam RESULT_POSITIVE = 'b10;
+localparam RESULT_ANIMATION_FRAME_DONE = 'b11;
+
+reg[2:0] state = STATE_IDLE;
 
 assign field_cell_write_value = 0; // Lose animation can only erase the cells.
 
@@ -47,7 +54,7 @@ always @(posedge clk) begin
     case(state)
         STATE_IDLE: begin
             if (start) begin
-                result <= 0;
+                result <= RESULT_NOT_COMPLETE;
                 piece_start_operation <= PIECE_OPERATION_COLLISION_CHECK;
 
                 state <= STATE_SCANNING;
@@ -61,7 +68,7 @@ always @(posedge clk) begin
                         state <= STATE_PREPARE_TO_ANIMATE;
                     end
                     PIECE_NO_COLLISIONS_DETECTED: begin
-                        result <= 'b01;
+                        result <= RESULT_NEGATIVE;
                         state <= STATE_IDLE;
                     end
                 endcase
@@ -75,23 +82,33 @@ always @(posedge clk) begin
 
             state <= STATE_ANIMATING;
         end
-        STATE_ANIMATING: begin // TODO: Animate.
+        STATE_ANIMATING: begin
             if (field_x == 12) begin
                 field_x <= 3;
 
-                if (field_y == 3) begin
-                    result <= 'b10;
-                    field_write_enable <= 0;
+                field_write_enable <= 0;
 
+                if (field_y == 3) begin
+                    result <= RESULT_POSITIVE;
                     state <= STATE_IDLE;
                 end else begin
                     field_y <= field_y - 1;
+
+                    result <= RESULT_ANIMATION_FRAME_DONE;
+                    state <= STATE_ANIMATING_INTERRUPTED;
                 end
             end else begin
                 field_x <= field_x + 1;
             end
         end
-    endcase    
+        STATE_ANIMATING_INTERRUPTED: begin
+            if(start) begin
+                field_write_enable <= 1;
+                result <= RESULT_NOT_COMPLETE;
+                state <= STATE_ANIMATING;
+            end
+        end
+    endcase
 end
 
 endmodule
