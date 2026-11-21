@@ -1,0 +1,14 @@
+[package]
+name = "module-tester"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+atmega-hal = { git = "https://github.com/Rahix/avr-hal.git", features = ["atmega2560", "rt"] }
+embedded-hal = "1.0"
+nb = "1.1.0"
+panic-halt = "1.0.0"
+ufmt = "0.2.0"
+
+[profile.release]
+panic = "abort"
