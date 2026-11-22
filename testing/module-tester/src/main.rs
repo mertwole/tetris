@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use atmega_hal::{Usart, delay::Delay, usart::Baudrate};
+use atmega_hal::{Usart, usart::Baudrate};
 use panic_halt as _;
 
 type ClockSpeed = atmega_hal::clock::MHz8;
