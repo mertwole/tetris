@@ -25,6 +25,7 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | burn         | 0001          | 1             |
 | lose         | 0010          | 2             |
 | field        | 0011          | 3             |
+| scores       | 0100          | 4             |
 
 ## Burn module
 
@@ -77,3 +78,21 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | din[3]                    | [16:14] |
 | **debug**                 |         |
 | address_valid             | 47      |
+
+## Scores module
+
+| wire                           | io#     |
+| ------------------------------ | ------- |
+| **burn reporting**             |         |
+| line_burned                    | 0       |
+| commit_burned_lines            | 1       |
+| **soft drop reporting**        |         |
+| soft_dropping                  | 2       |
+| reset_soft_drop_score          | 3       |
+| commit_soft_drop_score         | 4       |
+| **scores**                     |         |    
+| score[20]                      | [24:5]  |
+| lines_burned_bcd[12]           | [36:25] |
+| level[5]                       | [41:37] |
+| **debug**                      |         |
+| lines_burned_from_last_time[3] | [47:45] |

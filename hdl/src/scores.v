@@ -1,10 +1,6 @@
 module scores(
     input wire clk,
-
-    // Reset all the scores.
-    //
-    // Includes burned lines, level and score.
-    input wire reset_all,
+    input wire reset_n,
 
     // Signalize that one line was burned.
     //
@@ -41,10 +37,14 @@ module scores(
     output reg[11:0] lines_burned_bcd,
 
     // A current level.
-    output wire[4:0] level
+    output wire[4:0] level,
+
+    output wire[2:0] debug_lines_burned_from_last_time
 );
 
 reg[2:0] lines_burned_from_last_time = 0;
+assign debug_lines_burned_from_last_time = lines_burned_from_last_time;
+
 reg[4:0] soft_drop_score = 0;
 
 assign level = lines_burned_bcd[11:8] * 10 + lines_burned_bcd[7:4];
@@ -54,7 +54,7 @@ wire[3:0] lines_burned_digit_1_inc = lines_burned_bcd[7:4] + 1;
 wire[3:0] lines_burned_digit_2_inc = lines_burned_bcd[3:0] + 1;
 
 always @(posedge clk) begin
-    if (reset_all) begin
+    if (!reset_n) begin
         lines_burned_from_last_time <= 0;
         soft_drop_score <= 0;
         lines_burned_bcd <= 0;
