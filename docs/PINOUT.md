@@ -3,7 +3,7 @@
 For every module, the following wires must be present:
 
 - clk
-- reset_n
+- reset_n (except `field` module)
 - board id (4 wires)
 
 They are connected as follows:
@@ -24,6 +24,7 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | ------------ | :-----------: | :-----------: |
 | burn         | 0001          | 1             |
 | lose         | 0010          | 2             |
+| field        | 0011          | 3             |
 
 ## Burn module
 
@@ -62,3 +63,17 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | piece_operation_result[2] | [35:34] |
 | **debug**                 |         |
 | state[3]                  | [44:42] |
+
+## Field module
+
+| wire                      | io#     |
+| ------------------------- | ------- |
+| **read/write control**    |         |
+| x_coord[4]                | [3:0]   |
+| y_coord[5]                | [8:4]   |
+| read_enable               | 9       |
+| dout[3]                   | [12:10] |
+| write_enable              | 13      |
+| din[3]                    | [16:14] |
+| **debug**                 |         |
+| address_valid             | 47      |
