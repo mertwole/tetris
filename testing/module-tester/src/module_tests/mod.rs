@@ -4,7 +4,7 @@ use atmega_hal::{
     Atmega, Usart,
     port::{
         Pin,
-        mode::{Floating, Input},
+        mode::{Floating, Input, Output},
     },
     usart::UsartOps,
 };
@@ -12,8 +12,12 @@ use atmega_hal::{
 use crate::IO_PIN_COUNT;
 
 mod burn;
+mod field;
+mod lose;
+mod scores;
 
 type InputPin = Pin<Input<Floating>>;
+type OutputPin = Pin<Output>;
 
 const MODULE_SPECIFIC_PIN_COUNT: usize = IO_PIN_COUNT - 8;
 
@@ -43,9 +47,22 @@ where
         match read_board_id(&board_id) {
             BoardId::Burn => {
                 ufmt::uwriteln!(&mut serial, "burn module found").unwrap();
-
                 burn::run(serial, clk, reset_n, module_specific);
-
+                panic!("Done");
+            }
+            BoardId::Lose => {
+                ufmt::uwriteln!(&mut serial, "lose module found").unwrap();
+                lose::run(serial, clk, reset_n, module_specific);
+                panic!("Done");
+            }
+            BoardId::Field => {
+                ufmt::uwriteln!(&mut serial, "field module found").unwrap();
+                field::run(serial, clk, reset_n, module_specific);
+                panic!("Done");
+            }
+            BoardId::Scores => {
+                ufmt::uwriteln!(&mut serial, "scores module found").unwrap();
+                scores::run(serial, clk, reset_n, module_specific);
                 panic!("Done");
             }
             BoardId::Invalid(value) => {
@@ -58,6 +75,9 @@ where
 #[repr(u8)]
 enum BoardId {
     Burn,
+    Lose,
+    Field,
+    Scores,
     Invalid(u8),
 }
 
@@ -71,6 +91,9 @@ fn read_board_id(board_id_pins: &[InputPin; 4]) -> BoardId {
 
     match value {
         1 => BoardId::Burn,
+        2 => BoardId::Lose,
+        3 => BoardId::Field,
+        4 => BoardId::Scores,
         invalid => BoardId::Invalid(invalid),
     }
 }

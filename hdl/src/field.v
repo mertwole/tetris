@@ -17,13 +17,17 @@ module field (
     input wire[3:0] rendering_x,
     input wire[4:0] rendering_y,
 
-    output wire[2:0] rendering_dout
+    output wire[2:0] rendering_dout,
+
+    output wire debug_address_valid
 );
 
 wire[4:0] address_y = y_coord - 3;
 wire[3:0] address_x = x_coord - 3;
 wire[8:0] address = {address_y, address_x};
 wire address_valid = y_coord >= 3 && y_coord <= 22 && x_coord >= 3 && x_coord <= 12;
+
+assign debug_address_valid = address_valid;
 
 wire[4:0] rendering_address_y = rendering_y - 3;
 wire[3:0] rendering_address_x = rendering_x - 3;

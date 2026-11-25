@@ -204,7 +204,7 @@ module main (
 
   scores scores_inst(
     .clk(clk1x),
-    .reset_all(reset_scores),
+    .reset_n(!reset_scores),
     .line_burned(line_burned),
     .commit_burned_lines(commit_burned_lines),
     .soft_dropping(soft_dropping),

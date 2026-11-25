@@ -3,7 +3,7 @@
 For every module, the following wires must be present:
 
 - clk
-- reset_n
+- reset_n (except `field` module)
 - board id (4 wires)
 
 They are connected as follows:
@@ -16,11 +16,16 @@ They are connected as follows:
 
 All the buses are encoded starting from the MSB, i.e. for the `board_id` it means that MSB will be on the io#55.
 
+Remark: `burn` and `lose` module pinouts are designed such that it's possible to implement these 2 modules sharing a single connection to the base board.
+
 ## Board IDs
 
 | module       | board ID(bin) | board ID(dec) |
 | ------------ | :-----------: | :-----------: |
 | burn         | 0001          | 1             |
+| lose         | 0010          | 2             |
+| field        | 0011          | 3             |
+| scores       | 0100          | 4             |
 
 ## Burn module
 
@@ -41,3 +46,53 @@ All the buses are encoded starting from the MSB, i.e. for the `board_id` it mean
 | commit_burned_lines       | 28      |
 | **debug**                 |         |
 | state[3]                  | [47:45] |
+
+## Lose module
+
+| wire                      | io#     |
+| ------------------------- | ------- |
+| **field write**           |         |
+| field_x[4]                | [3:0]   |
+| field_y[5]                | [8:4]   |
+| field_write_enable        | 13      |
+| field_cell_write_value[3] | [16:14] |
+| **control**               |         |
+| start                     | 29      |
+| result[2]                 | [31:30] |
+| **piece operation**       |         |  
+| piece_start_operation[2]  | [33:32] |
+| piece_operation_result[2] | [35:34] |
+| **debug**                 |         |
+| state[3]                  | [44:42] |
+
+## Field module
+
+| wire                      | io#     |
+| ------------------------- | ------- |
+| **read/write control**    |         |
+| x_coord[4]                | [3:0]   |
+| y_coord[5]                | [8:4]   |
+| read_enable               | 9       |
+| dout[3]                   | [12:10] |
+| write_enable              | 13      |
+| din[3]                    | [16:14] |
+| **debug**                 |         |
+| address_valid             | 47      |
+
+## Scores module
+
+| wire                           | io#     |
+| ------------------------------ | ------- |
+| **burn reporting**             |         |
+| line_burned                    | 0       |
+| commit_burned_lines            | 1       |
+| **soft drop reporting**        |         |
+| soft_dropping                  | 2       |
+| reset_soft_drop_score          | 3       |
+| commit_soft_drop_score         | 4       |
+| **scores**                     |         |    
+| score[20]                      | [24:5]  |
+| lines_burned_bcd[12]           | [36:25] |
+| level[5]                       | [41:37] |
+| **debug**                      |         |
+| lines_burned_from_last_time[3] | [47:45] |
