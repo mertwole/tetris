@@ -13,17 +13,17 @@ use embedded_hal::delay::DelayNs;
 
 use crate::{ClockSpeed, IO_PIN_COUNT};
 
+type InputPin = Pin<Input<Floating>>;
+
 pub fn fpga_communication_test<USART, RX, TX, CLOCK>(
     mut serial: &mut Usart<USART, RX, TX, CLOCK>,
-    io_pins: [Pin<Input<Floating>>; IO_PIN_COUNT],
+    io_pins: [InputPin; IO_PIN_COUNT],
 ) -> !
 where
     USART: UsartOps<Atmega, RX, TX>,
 {
-    let (outputs, inputs): (
-        [Pin<Input<Floating>>; IO_PIN_COUNT - 6],
-        [Pin<Input<Floating>>; 6],
-    ) = unsafe { mem::transmute(io_pins) };
+    let (outputs, inputs): ([InputPin; IO_PIN_COUNT - 6], [InputPin; 6]) =
+        unsafe { mem::transmute(io_pins) };
     let mut outputs = outputs.map(|pin| pin.into_output());
 
     let read_inputs = || -> usize {
@@ -44,8 +44,8 @@ where
         // Wait for any input.
         let _ = serial.read_byte();
 
-        for i in 0..IO_PIN_COUNT - 6 {
-            outputs[i].set_high();
+        for (i, output) in outputs.iter_mut().enumerate() {
+            output.set_high();
             delay.delay_ms(100);
 
             ufmt::uwrite!(&mut serial, "testing io_{}...", i).unwrap();
@@ -55,7 +55,7 @@ where
             } else {
                 ufmt::uwriteln!(&mut serial, "failed(got {})", result).unwrap();
             }
-            outputs[i].set_low();
+            output.set_low();
             delay.delay_ms(100);
         }
     }

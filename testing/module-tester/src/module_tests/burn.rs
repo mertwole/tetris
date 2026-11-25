@@ -16,37 +16,32 @@ pub fn run<USART, RX, TX, CLOCK>(
     mut clk: Pin<Output>,
     mut reset_n: Pin<Output>,
     io_pins: [Pin<Input<Floating>>; MODULE_SPECIFIC_PIN_COUNT],
-) -> !
-where
+) where
     USART: UsartOps<Atmega, RX, TX>,
 {
     let mut io = Io::parse(io_pins);
 
     let mut delay = Delay::<ClockSpeed>::new();
 
-    loop {
-        clk.set_low();
-        reset_n.set_low();
+    clk.set_low();
+    reset_n.set_low();
 
-        delay.delay_ms(1);
+    delay.delay_ms(1);
 
-        reset_n.set_high();
-        io.start.set_high();
+    reset_n.set_high();
+    io.start.set_high();
 
-        delay.delay_ms(1);
+    delay.delay_ms(1);
 
-        clk.set_high();
+    clk.set_high();
 
-        let state = [
-            io.state[0].is_high(),
-            io.state[1].is_high(),
-            io.state[2].is_high(),
-        ];
+    let state = [
+        io.state[0].is_high(),
+        io.state[1].is_high(),
+        io.state[2].is_high(),
+    ];
 
-        ufmt::uwriteln!(&mut serial, "state after start: {:?}", state).unwrap();
-
-        panic!("Done");
-    }
+    ufmt::uwriteln!(&mut serial, "state after start: {:?}", state).unwrap();
 }
 
 struct Io {
@@ -86,34 +81,34 @@ impl Io {
             io_14,
             io_15,
             io_16,
-            io_17,
-            io_18,
-            io_19,
-            io_20,
-            io_21,
-            io_22,
-            io_23,
+            _io_17,
+            _io_18,
+            _io_19,
+            _io_20,
+            _io_21,
+            _io_22,
+            _io_23,
             io_24,
             io_25,
             io_26,
             io_27,
             io_28,
-            io_29,
-            io_30,
-            io_31,
-            io_32,
-            io_33,
-            io_34,
-            io_35,
-            io_36,
-            io_37,
-            io_38,
-            io_39,
-            io_40,
-            io_41,
-            io_42,
-            io_43,
-            io_44,
+            _io_29,
+            _io_30,
+            _io_31,
+            _io_32,
+            _io_33,
+            _io_34,
+            _io_35,
+            _io_36,
+            _io_37,
+            _io_38,
+            _io_39,
+            _io_40,
+            _io_41,
+            _io_42,
+            _io_43,
+            _io_44,
             io_45,
             io_46,
             io_47,

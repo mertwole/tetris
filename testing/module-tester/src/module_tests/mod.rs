@@ -9,22 +9,24 @@ use atmega_hal::{
     usart::UsartOps,
 };
 
-use crate::{ClockSpeed, IO_PIN_COUNT};
+use crate::IO_PIN_COUNT;
 
 mod burn;
+
+type InputPin = Pin<Input<Floating>>;
 
 const MODULE_SPECIFIC_PIN_COUNT: usize = IO_PIN_COUNT - 8;
 
 pub fn run<USART, RX, TX, CLOCK>(
     mut serial: &mut Usart<USART, RX, TX, CLOCK>,
-    io_pins: [Pin<Input<Floating>>; IO_PIN_COUNT],
+    io_pins: [InputPin; IO_PIN_COUNT],
 ) -> !
 where
     USART: UsartOps<Atmega, RX, TX>,
 {
     let (module_specific, common): (
-        [Pin<Input<Floating>>; MODULE_SPECIFIC_PIN_COUNT],
-        [Pin<Input<Floating>>; IO_PIN_COUNT - MODULE_SPECIFIC_PIN_COUNT],
+        [InputPin; MODULE_SPECIFIC_PIN_COUNT],
+        [InputPin; IO_PIN_COUNT - MODULE_SPECIFIC_PIN_COUNT],
     ) = unsafe { mem::transmute(io_pins) };
 
     let [io_48, io_49, _io_50, _io_51, io_52, io_53, io_54, io_55] = common;
@@ -43,6 +45,8 @@ where
                 ufmt::uwriteln!(&mut serial, "burn module found").unwrap();
 
                 burn::run(serial, clk, reset_n, module_specific);
+
+                panic!("Done");
             }
             BoardId::Invalid(value) => {
                 ufmt::uwriteln!(&mut serial, "invalid module with id={}", value).unwrap();
@@ -57,7 +61,7 @@ enum BoardId {
     Invalid(u8),
 }
 
-fn read_board_id(board_id_pins: &[Pin<Input<Floating>>; 4]) -> BoardId {
+fn read_board_id(board_id_pins: &[InputPin; 4]) -> BoardId {
     let value = board_id_pins
         .iter()
         .rev()

@@ -30,11 +30,9 @@ where
             read_bytes += 1;
         }
 
-        let is_valid_digit = |char: u8| -> bool { char >= b'0' && char <= b'9' };
-
         let pin_idx = match read_bytes {
             1 => {
-                if !is_valid_digit(pin_to_toggle[0]) {
+                if !pin_to_toggle[0].is_ascii_digit() {
                     ufmt::uwriteln!(&mut serial, "Wrong input format").unwrap();
                     continue;
                 }
@@ -42,7 +40,7 @@ where
                 pin_to_toggle[0] - b'0'
             }
             2 => {
-                if !is_valid_digit(pin_to_toggle[0]) || !is_valid_digit(pin_to_toggle[1]) {
+                if !pin_to_toggle[0].is_ascii_digit() || !pin_to_toggle[1].is_ascii_digit() {
                     ufmt::uwriteln!(&mut serial, "Wrong input format").unwrap();
                     continue;
                 }
