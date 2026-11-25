@@ -12,6 +12,7 @@ use atmega_hal::{
 use crate::IO_PIN_COUNT;
 
 mod burn;
+mod field;
 mod lose;
 
 type InputPin = Pin<Input<Floating>>;
@@ -53,6 +54,11 @@ where
                 lose::run(serial, clk, reset_n, module_specific);
                 panic!("Done");
             }
+            BoardId::Field => {
+                ufmt::uwriteln!(&mut serial, "field module found").unwrap();
+                field::run(serial, clk, reset_n, module_specific);
+                panic!("Done");
+            }
             BoardId::Invalid(value) => {
                 ufmt::uwriteln!(&mut serial, "invalid module with id={}", value).unwrap();
             }
@@ -64,6 +70,7 @@ where
 enum BoardId {
     Burn,
     Lose,
+    Field,
     Invalid(u8),
 }
 
@@ -78,6 +85,7 @@ fn read_board_id(board_id_pins: &[InputPin; 4]) -> BoardId {
     match value {
         1 => BoardId::Burn,
         2 => BoardId::Lose,
+        3 => BoardId::Field,
         invalid => BoardId::Invalid(invalid),
     }
 }
