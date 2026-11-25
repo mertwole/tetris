@@ -1,5 +1,6 @@
 module lose(
     input wire clk,
+    input wire reset_n,
 
     // Start checking the current piece cells and playing the lose animation(if required).
     input wire start,
@@ -26,7 +27,12 @@ module lose(
     // Start an operation on the current piece.
     output reg[1:0] piece_start_operation = 0,
     // Result of the piece operation started by setting `piece_start_operation`.
-    input wire[1:0] piece_operation_result
+    input wire[1:0] piece_operation_result,
+
+    /// The current internal state of the module.
+    ///
+    /// Must only be used for debug purposes.
+    output wire[2:0] debug_state
 );
 
 localparam STATE_IDLE = 'b000;
@@ -47,17 +53,23 @@ localparam RESULT_POSITIVE = 'b10;
 localparam RESULT_ANIMATION_FRAME_DONE = 'b11;
 
 reg[2:0] state = STATE_IDLE;
+assign debug_state = state;
 
 assign field_cell_write_value = 0; // Lose animation can only erase the cells.
 
 always @(posedge clk) begin
-    case(state)
+    // Override the state with STATE_IDLE under reset.
+    case(!reset_n ? STATE_IDLE : state)
         STATE_IDLE: begin
-            if (start) begin
-                result <= RESULT_NOT_COMPLETE;
-                piece_start_operation <= PIECE_OPERATION_COLLISION_CHECK;
+            field_write_enable <= 0;
+            result <= RESULT_NOT_COMPLETE;
 
+            if (start) begin
+                piece_start_operation <= PIECE_OPERATION_COLLISION_CHECK;
                 state <= STATE_SCANNING;
+            end else begin
+                piece_start_operation <= PIECE_OPERATION_NONE;
+                state <= STATE_IDLE;
             end
         end
         STATE_SCANNING: begin
