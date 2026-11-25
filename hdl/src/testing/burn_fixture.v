@@ -6,11 +6,11 @@ module burn_fixture (
     wire clk = io[48];
     wire reset_n = io[49];
 
-    wire[3:0] board_id = io[55:52];
-    assign board_id = 4'b0001;
+    assign io[55:52] = 4'b0001;
 
     burn burn_inst(
         .clk(clk),
+        .reset_n(reset_n),
 
         .start(io[24]),
         .result(io[26:25]),
