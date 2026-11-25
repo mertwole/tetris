@@ -1,10 +1,4 @@
-create_clock -period 20.000 [get_ports clk]
-
-set_property PACKAGE_PIN N18 [get_ports clk]
-set_property IOSTANDARD LVCMOS33 [get_ports clk]
-
-set_property PACKAGE_PIN P16 [get_ports rst_n]
-set_property IOSTANDARD LVCMOS33 [get_ports rst_n]
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets io_IBUF[48]]
 
 # GPIO 1
 set_property PACKAGE_PIN Y18 [get_ports { io[0] }]

@@ -1,5 +1,6 @@
 module burn (
     input wire clk,
+    input wire reset_n,
 
     // Start checking the complete lines and playing the burn animation.
     input wire start,
@@ -40,7 +41,12 @@ module burn (
     // Signalize that all the burn operations are complete.
     //
     // Will be asserted for a single clock cycle.
-    output reg commit_burned_lines = 0
+    output reg commit_burned_lines = 0,
+
+    /// The current internal state of the module.
+    ///
+    /// Must only be used for debug purposes.
+    output wire[2:0] debug_state
 );
 
 localparam STATE_IDLE = 'b000;
@@ -56,6 +62,7 @@ localparam RESULT_ANIMATION_FRAME_DONE = 'b01;
 localparam RESULT_DONE = 'b11;
 
 reg[2:0] state = STATE_IDLE;
+assign debug_state = state;
 
 reg is_current_line_complete = 1;
 
@@ -66,7 +73,8 @@ reg[2:0] currently_burning_y = 0;
 reg delay_after_read = 0;
 
 always @(posedge clk) begin
-    case(state)
+    // Override the state with STATE_IDLE under reset.
+    case(!reset_n ? STATE_IDLE : state)
         STATE_IDLE: begin
             commit_burned_lines <= 0;
 
@@ -82,6 +90,8 @@ always @(posedge clk) begin
 
                 result <= RESULT_IN_PROGRESS;
                 state <= STATE_SCANNING;
+            end else begin
+                state <= STATE_IDLE;
             end
         end
         STATE_SCANNING: begin
