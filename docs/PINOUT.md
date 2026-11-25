@@ -12,9 +12,9 @@ They are connected as follows:
 | ----------- | ------- |
 | clk         | 48      |
 | reset_n     | 49      |
-| board_id[4] | [52:55] |
+| board_id[4] | [55:52] |
 
-All the buses are encoded starting from the MSB, i.e. for the `board_id` it means that MSB will be on the io#52.
+All the buses are encoded starting from the MSB, i.e. for the `board_id` it means that MSB will be on the io#55.
 
 ## Board IDs
 
@@ -27,17 +27,17 @@ All the buses are encoded starting from the MSB, i.e. for the `board_id` it mean
 | wire                      | io#     |
 | ------------------------- | ------- |
 | **field read/write**      |         |
-| field_x[4]                | [0:3]   |
-| field_y[5]                | [4:8]   |
+| field_x[4]                | [3:0]   |
+| field_y[5]                | [8:4]   |
 | field_read_enable         | 9       |
-| field_cell_read_value[3]  | [10:12] |
+| field_cell_read_value[3]  | [12:10] |
 | field_write_enable        | 13      |
-| field_cell_write_value[3] | [14:16] |
+| field_cell_write_value[3] | [16:14] |
 | **control**               |         |
 | start                     | 24      |
-| result[2]                 | [25:26] |
+| result[2]                 | [26:25] |
 | **reporting**             |         |  
 | line_burned               | 27      |
 | commit_burned_lines       | 28      |
 | **debug**                 |         |
-| state[3]                  | [45:47] |
+| state[3]                  | [47:45] |
