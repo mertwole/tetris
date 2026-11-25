@@ -1,21 +1,16 @@
-use atmega_hal::{
-    Atmega, Usart,
-    delay::Delay,
-    port::{
-        Pin,
-        mode::{Floating, Input, Output},
-    },
-    usart::UsartOps,
-};
+use atmega_hal::{Atmega, Usart, delay::Delay, port::Pin, usart::UsartOps};
 use embedded_hal::delay::DelayNs;
 
-use crate::{ClockSpeed, module_tests::MODULE_SPECIFIC_PIN_COUNT};
+use crate::{
+    ClockSpeed,
+    module_tests::{InputPin, MODULE_SPECIFIC_PIN_COUNT, OutputPin},
+};
 
 pub fn run<USART, RX, TX, CLOCK>(
     mut serial: &mut Usart<USART, RX, TX, CLOCK>,
-    mut clk: Pin<Output>,
-    mut reset_n: Pin<Output>,
-    io_pins: [Pin<Input<Floating>>; MODULE_SPECIFIC_PIN_COUNT],
+    mut clk: OutputPin,
+    mut reset_n: OutputPin,
+    io_pins: [InputPin; MODULE_SPECIFIC_PIN_COUNT],
 ) where
     USART: UsartOps<Atmega, RX, TX>,
 {
@@ -45,24 +40,24 @@ pub fn run<USART, RX, TX, CLOCK>(
 }
 
 struct Io {
-    field_x: [Pin<Output>; 4],
-    field_y: [Pin<Output>; 5],
-    field_read_enable: Pin<Output>,
-    field_cell_read_value: [Pin<Input<Floating>>; 3],
-    field_write_enable: Pin<Output>,
-    field_cell_write_value: [Pin<Output>; 3],
+    field_x: [OutputPin; 4],
+    field_y: [OutputPin; 5],
+    field_read_enable: OutputPin,
+    field_cell_read_value: [InputPin; 3],
+    field_write_enable: OutputPin,
+    field_cell_write_value: [OutputPin; 3],
 
-    start: Pin<Output>,
-    result: [Pin<Input<Floating>>; 2],
+    start: OutputPin,
+    result: [InputPin; 2],
 
-    line_burned: Pin<Input<Floating>>,
-    commit_burned_lines: Pin<Input<Floating>>,
+    line_burned: InputPin,
+    commit_burned_lines: InputPin,
 
-    state: [Pin<Input<Floating>>; 3],
+    state: [InputPin; 3],
 }
 
 impl Io {
-    fn parse(pins: [Pin<Input<Floating>>; MODULE_SPECIFIC_PIN_COUNT]) -> Self {
+    fn parse(pins: [InputPin; MODULE_SPECIFIC_PIN_COUNT]) -> Self {
         let [
             io_0,
             io_1,
