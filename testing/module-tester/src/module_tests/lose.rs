@@ -40,10 +40,10 @@ pub fn run<USART, RX, TX, CLOCK>(
 }
 
 struct Io {
-    field_x: [OutputPin; 4],
-    field_y: [OutputPin; 5],
-    field_write_enable: OutputPin,
-    field_cell_write_value: [OutputPin; 3],
+    field_x: [InputPin; 4],
+    field_y: [InputPin; 5],
+    field_write_enable: InputPin,
+    field_cell_write_value: [InputPin; 3],
 
     start: OutputPin,
     result: [InputPin; 2],
