@@ -108,10 +108,10 @@ impl Io {
         ] = pins;
 
         Self {
-            field_x: [io_3, io_2, io_1, io_0].map(Pin::into_output),
-            field_y: [io_8, io_7, io_6, io_5, io_4].map(Pin::into_output),
-            field_write_enable: io_13.into_output(),
-            field_cell_write_value: [io_16, io_15, io_14].map(Pin::into_output),
+            field_x: [io_3, io_2, io_1, io_0],
+            field_y: [io_8, io_7, io_6, io_5, io_4],
+            field_write_enable: io_13,
+            field_cell_write_value: [io_16, io_15, io_14],
 
             start: io_29.into_output(),
             result: [io_31, io_30],
