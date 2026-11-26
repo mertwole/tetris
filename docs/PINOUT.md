@@ -27,6 +27,7 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | field        | 0011          | 3             |
 | scores       | 0100          | 4             |
 | game_loop    | 0101          | 5             |
+| piece        | 0110          | 6             |
 
 ## Burn module
 
@@ -140,3 +141,31 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | state[4]                       | [45:42] |
 | animating_burn                 | 46      |
 | animating_lose                 | 47      |
+
+## Piece module
+
+| wire                      | io#     |
+| ------------------------- | ------- |
+| **field read/write**      |         |
+| field_x[4]                | [3:0]   |
+| field_y[5]                | [8:4]   |
+| field_read_enable         | 9       |
+| field_cell_read_value[3]  | [12:10] |
+| field_write_enable        | 13      |
+| field_cell_write_value[3] | [16:14] |
+| **spawn**                 |         |
+| spawned_type[3]           | [19:17] |
+| **move/rotate**           |         |
+| movement_in[3]            | [22:20] |
+| rotation_in[2]            | [24:23] |
+| **operation**             |         |
+| start_operation[2]        | [26:25] |
+| operation_result[2]       | [28:27] |
+| **center position**       |         |
+| center_y[5]               | [33:29] |
+| **type**                  |         |
+| type[3]                   | [36:34] |
+| **debug**                 |         |
+| center_x[4]               | [43:40] |
+| rotation[2]               | [45:44] |
+| op_state[2]               | [47:46] |

@@ -182,6 +182,7 @@ module main (
 
   next_piece next_piece_inst(
     .clk(clk1x),
+    .reset_n(1),
 
     .gen(generate_next_piece),
 
