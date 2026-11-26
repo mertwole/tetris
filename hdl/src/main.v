@@ -255,6 +255,7 @@ module main (
 
   burn burn_inst(
     .clk(clk1x),
+    .reset_n(1),
 
     .start(start_burn),
     .result(burn_result),
@@ -298,6 +299,7 @@ module main (
 
   lose lose_inst(
     .clk(clk1x),
+    .reset_n(1),
 
     .start(start_lose),
     .result(lose_result),
@@ -357,6 +359,7 @@ module main (
 
   game_loop game_loop_inst(
     .clk(clk1x),
+    .reset_n(1),
 
     .button_rotate_cw(button_rotate_cw_pressed),
     .button_rotate_ccw(button_rotate_ccw_pressed),

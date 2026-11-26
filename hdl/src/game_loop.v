@@ -1,5 +1,6 @@
 module game_loop(
     input wire clk,
+    input wire reset_n,
 
     // Button for clockwise piece rotation.
     input wire button_rotate_cw,
@@ -62,7 +63,11 @@ module game_loop(
     // Start an operation on the current piece.
     output reg[1:0] start_piece_operation,
     // Result of the piece operation started by setting `piece_start_operation`.
-    input wire[1:0] piece_operation_result
+    input wire[1:0] piece_operation_result,
+
+    output wire[3:0] debug_state,
+    output wire debug_animating_burn,
+    output wire debug_animating_lose
 );
 
 localparam STATE_INIT = 'b0000;
@@ -114,6 +119,7 @@ localparam LOSE_RESULT_POSITIVE = 'b10;
 localparam LOSE_RESULT_ANIMATION_FRAME_DONE = 'b11;
 
 reg[3:0] state = STATE_INIT;
+assign debug_state = state;
 
 reg[1:0] game_state = GAME_STATE_INIT;
 assign game_state_out = game_state;
@@ -155,285 +161,326 @@ reg[3:0] das_delay = INITIAL_DAS_DELAY;
 reg das_direction = 0;
 
 reg animating_burn = 0;
+assign debug_animating_burn = animating_burn;
+
 reg animating_lose = 0;
+assign debug_animating_lose = animating_lose;
 
 always @(posedge clk) begin
-    current_frame_duration <= current_frame_duration + 1;
+    if (!reset_n) begin
+        current_frame_duration <= 0;
+        
+        piece_movement <= 0;
+        piece_rotation <= 0;
+        
+        start_burn <= 0;
+        start_lose_check <= 0;
+        
+        generate_new_piece <= 0;
+        
+        soft_dropping_movement <= 0;
+        reset_soft_drop_score <= 0;
+        commit_soft_drop_score <= 0;
+        
+        start_piece_operation <= 0;
+        
+        state <= STATE_INIT;
+        game_state <= GAME_STATE_INIT;
+        
+        rotate_cw_prev_state <= 0;
+        rotate_ccw_prev_state <= 0;
+        left_prev_state <= 0;
+        right_prev_state <= 0;
+        start_prev_state <= 0;
+        
+        soft_dropping <= 0;
+        are_timer <= 0;
+        frames_from_last_fall <= 0;
+        
+        piece_movement_inverse <= 0;
+        piece_rotation_inverse <= 0;
+        
+        das_delay <= INITIAL_DAS_DELAY;
+        das_direction <= 0;
+        
+        animating_burn <= 0;
+        animating_lose <= 0;
+    end else begin
+        current_frame_duration <= current_frame_duration + 1;
 
-    case (state)
-        STATE_INIT: begin
-            init_stage <= init_stage + 1;
+        case (state)
+            STATE_INIT: begin
+                init_stage <= init_stage + 1;
 
-            case(init_stage)
-                0: begin
-                    generate_new_piece <= 1;
-                end
-                1: begin
-                    generate_new_piece <= 0;
-                end
-                2: begin
-                    generate_new_piece <= 1;
-                    state <= STATE_PROCESSING_INPUT;
-                end
-            endcase
-
-            // TODO: Initialize piece, field and so on.
-        end
-        STATE_PROCESSING_INPUT: begin
-            generate_new_piece <= 0;
-            
-            rotate_cw_prev_state = button_rotate_cw;
-            rotate_ccw_prev_state = button_rotate_ccw;
-            left_prev_state = button_left;
-            right_prev_state = button_right;
-            start_prev_state = button_start;
-
-            if (start_just_pressed) begin
-                case (game_state) 
-                    GAME_STATE_INIT: game_state <= GAME_STATE_PLAY;
-                    GAME_STATE_PLAY: game_state <= GAME_STATE_PAUSE;
-                    GAME_STATE_PAUSE: game_state <= GAME_STATE_PLAY;
-                    GAME_STATE_GAME_OVER: game_state <= GAME_STATE_INIT;
+                case(init_stage)
+                    0: begin
+                        generate_new_piece <= 1;
+                    end
+                    1: begin
+                        generate_new_piece <= 0;
+                    end
+                    2: begin
+                        generate_new_piece <= 1;
+                        state <= STATE_PROCESSING_INPUT;
+                    end
                 endcase
+            end
+            STATE_PROCESSING_INPUT: begin
+                generate_new_piece <= 0;
+                
+                rotate_cw_prev_state = button_rotate_cw;
+                rotate_ccw_prev_state = button_rotate_ccw;
+                left_prev_state = button_left;
+                right_prev_state = button_right;
+                start_prev_state = button_start;
 
-                state <= STATE_RENDER;
-            end else if(game_state == GAME_STATE_PLAY) begin
-                if (animating_burn) begin
-                    start_burn <= 1;
-                    state <= STATE_BURNING;
-                end else if(animating_lose) begin
-                    start_lose_check <= 1;
-                    state <= STATE_CHECK_LOSE;
-                end else begin
-                    piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
-                    piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
+                if (start_just_pressed) begin
+                    case (game_state) 
+                        GAME_STATE_INIT: game_state <= GAME_STATE_PLAY;
+                        GAME_STATE_PLAY: game_state <= GAME_STATE_PAUSE;
+                        GAME_STATE_PAUSE: game_state <= GAME_STATE_PLAY;
+                        GAME_STATE_GAME_OVER: game_state <= GAME_STATE_INIT;
+                    endcase
 
-                    soft_dropping <= button_down;
+                    state <= STATE_RENDER;
+                end else if(game_state == GAME_STATE_PLAY) begin
+                    if (animating_burn) begin
+                        start_burn <= 1;
+                        state <= STATE_BURNING;
+                    end else if(animating_lose) begin
+                        start_lose_check <= 1;
+                        state <= STATE_CHECK_LOSE;
+                    end else begin
+                        piece_rotation <= {rotate_ccw_just_pressed, rotate_cw_just_pressed};
+                        piece_rotation_inverse <= ~{rotate_ccw_just_pressed, rotate_cw_just_pressed};
 
-                    if(
-                        (das_direction == DAS_DIRECTION_LEFT && button_left) || 
-                        (das_direction == DAS_DIRECTION_RIGHT && button_right)
-                    ) begin
-                        if (das_delay == 0) begin
-                            das_delay <= REPEATED_DAS_DELAY;
+                        soft_dropping <= button_down;
 
-                            case (das_direction)
-                                DAS_DIRECTION_LEFT: begin
+                        if(
+                            (das_direction == DAS_DIRECTION_LEFT && button_left) || 
+                            (das_direction == DAS_DIRECTION_RIGHT && button_right)
+                        ) begin
+                            if (das_delay == 0) begin
+                                das_delay <= REPEATED_DAS_DELAY;
+
+                                case (das_direction)
+                                    DAS_DIRECTION_LEFT: begin
+                                        piece_movement <= PIECE_MOVEMENT_LEFT;
+                                        piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
+                                    end
+                                    DAS_DIRECTION_RIGHT: begin
+                                        piece_movement <= PIECE_MOVEMENT_RIGHT;
+                                        piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
+                                    end
+                                endcase
+                            end else begin
+                                das_delay <= das_delay - 1;
+                            end
+                        end else begin
+                            das_delay <= INITIAL_DAS_DELAY;
+
+                            case ({left_just_pressed, right_just_pressed})
+                                'b10: begin
+                                    das_direction <= DAS_DIRECTION_LEFT;
                                     piece_movement <= PIECE_MOVEMENT_LEFT;
                                     piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
                                 end
-                                DAS_DIRECTION_RIGHT: begin
+                                'b01: begin
+                                    das_direction <= DAS_DIRECTION_RIGHT;
                                     piece_movement <= PIECE_MOVEMENT_RIGHT;
                                     piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
                                 end
+                                default: begin
+                                    piece_movement <= PIECE_MOVEMENT_NONE;
+                                    piece_movement_inverse <= PIECE_MOVEMENT_NONE;
+                                end
                             endcase
-                        end else begin
-                            das_delay <= das_delay - 1;
                         end
-                    end else begin
-                        das_delay <= INITIAL_DAS_DELAY;
 
-                        case ({left_just_pressed, right_just_pressed})
-                            'b10: begin
-                                das_direction <= DAS_DIRECTION_LEFT;
-                                piece_movement <= PIECE_MOVEMENT_LEFT;
-                                piece_movement_inverse <= PIECE_MOVEMENT_RIGHT;
-                            end
-                            'b01: begin
-                                das_direction <= DAS_DIRECTION_RIGHT;
-                                piece_movement <= PIECE_MOVEMENT_RIGHT;
-                                piece_movement_inverse <= PIECE_MOVEMENT_LEFT;
-                            end
-                            default: begin
-                                piece_movement <= PIECE_MOVEMENT_NONE;
-                                piece_movement_inverse <= PIECE_MOVEMENT_NONE;
-                            end
-                        endcase
+                        start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
+                        state <= STATE_BOUNDS_CHECK;
                     end
-
-                    start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
-                    state <= STATE_BOUNDS_CHECK;
-                end
-            end else begin
-                if (game_state == GAME_STATE_PAUSE) begin
-                    start_piece_operation <= PIECE_OPERATION_WRITE;
-                    state <= STATE_PUT_PIECE_TO_FIELD;
                 end else begin
-                    state <= STATE_RENDER;
-                end
-            end
-        end
-        STATE_BOUNDS_CHECK: begin
-            soft_dropping_movement <= 0;
-            
-            if (start_piece_operation == PIECE_OPERATION_NONE) begin
-                case(piece_operation_result) 
-                    PIECE_COLLISION_DETECTED: begin
-                        piece_movement <= piece_movement_inverse;
-                        piece_rotation <= piece_rotation_inverse;
-
-                        state <= STATE_ARE;
-                    end
-                    PIECE_NO_COLLISIONS_DETECTED: begin
-                        state <= STATE_ARE;
-                    end
-                endcase
-            end else begin
-                piece_rotation <= 0;
-                piece_movement <= PIECE_MOVEMENT_NONE;
-                start_piece_operation <= PIECE_OPERATION_NONE;
-            end
-        end
-        STATE_ARE: begin
-            piece_movement <= 0;
-            piece_rotation <= 0;
-
-            if (are_timer <= 1) begin
-                state <= STATE_GRAVITY;
-            end else begin
-                are_timer <= are_timer - 1;
-                state <= STATE_RENDER;
-            end
-        end
-        STATE_GRAVITY: begin
-            if (frames_from_last_fall >= current_gravity) begin
-                frames_from_last_fall <= 1;
-
-                if (soft_dropping) begin
-                    soft_dropping_movement <= 1;
-                end
-
-                piece_movement <= PIECE_MOVEMENT_DOWN;
-                start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
-                
-                state <= STATE_SETTLEMENT_CHECK;
-            end else begin
-                frames_from_last_fall <= frames_from_last_fall + 1;
-                    
-                start_piece_operation <= PIECE_OPERATION_WRITE;
-                state <= STATE_PUT_PIECE_TO_FIELD;
-            end
-        end
-        STATE_SETTLEMENT_CHECK: begin
-            if(start_piece_operation == PIECE_OPERATION_NONE) begin
-                case(piece_operation_result) 
-                    PIECE_COLLISION_DETECTED: begin
-                        piece_movement <= PIECE_MOVEMENT_UP;
-                        state <= STATE_SETTLE;
-                    end
-                    PIECE_NO_COLLISIONS_DETECTED: begin
+                    if (game_state == GAME_STATE_PAUSE) begin
                         start_piece_operation <= PIECE_OPERATION_WRITE;
                         state <= STATE_PUT_PIECE_TO_FIELD;
-                    end
-                endcase
-            end else begin
-                start_piece_operation <= PIECE_OPERATION_NONE;
-                soft_dropping_movement <= 0;
-                piece_movement <= PIECE_MOVEMENT_NONE;
-            end
-        end
-        STATE_SETTLE: begin
-            piece_movement <= PIECE_MOVEMENT_NONE;
-
-            are_timer <= are_by_piece_position(current_piece_center_y);
-
-            if (soft_dropping) begin
-                commit_soft_drop_score <= 1;
-            end
-            soft_dropping <= 0;
-
-            start_piece_operation <= PIECE_OPERATION_WRITE;
-
-            state <= STATE_WRITE_PIECE_TO_FIELD;
-        end
-        STATE_WRITE_PIECE_TO_FIELD: begin
-            if(start_piece_operation == PIECE_OPERATION_NONE) begin
-                if (piece_operation_result != 0) begin
-                    start_burn <= 1;
-                    state <= STATE_BURNING;
-                end
-            end else begin
-                start_piece_operation <= PIECE_OPERATION_NONE;
-                commit_soft_drop_score <= 0;
-            end
-        end
-        STATE_BURNING: begin
-            start_burn <= 0;
-
-            if (!start_burn) begin
-                case(burn_result)
-                    BURN_RESULT_DONE: begin
-                        generate_new_piece <= 1;
-                        frames_from_last_fall <= 0;
-                        start_lose_check <= 1;
-                        animating_burn <= 0;
-
-                        state <= STATE_CHECK_LOSE;
-                    end
-                    BURN_RESULT_ANIMATION_FRAME_DONE: begin
-                        animating_burn <= 1;
+                    end else begin
                         state <= STATE_RENDER;
                     end
-                endcase
-            end
-        end
-        STATE_CHECK_LOSE: begin
-            generate_new_piece <= 0;
-            start_lose_check <= 0;
-
-            if(!start_lose_check && (lose_result != LOSE_RESULT_NOT_COMPLETE)) begin
-                if(lose_result == LOSE_RESULT_POSITIVE) begin
-                    game_state <= GAME_STATE_GAME_OVER;
                 end
-
-                animating_lose <= lose_result == LOSE_RESULT_ANIMATION_FRAME_DONE;
-
-                state <= STATE_RENDER;
             end
-        end
-        STATE_PUT_PIECE_TO_FIELD: begin
-            if(start_piece_operation == PIECE_OPERATION_NONE) begin
-                if (piece_operation_result != 0) begin
+            STATE_BOUNDS_CHECK: begin
+                soft_dropping_movement <= 0;
+                
+                if (start_piece_operation == PIECE_OPERATION_NONE) begin
+                    case(piece_operation_result) 
+                        PIECE_COLLISION_DETECTED: begin
+                            piece_movement <= piece_movement_inverse;
+                            piece_rotation <= piece_rotation_inverse;
+
+                            state <= STATE_ARE;
+                        end
+                        PIECE_NO_COLLISIONS_DETECTED: begin
+                            state <= STATE_ARE;
+                        end
+                    endcase
+                end else begin
+                    piece_rotation <= 0;
+                    piece_movement <= PIECE_MOVEMENT_NONE;
+                    start_piece_operation <= PIECE_OPERATION_NONE;
+                end
+            end
+            STATE_ARE: begin
+                piece_movement <= 0;
+                piece_rotation <= 0;
+
+                if (are_timer <= 1) begin
+                    state <= STATE_GRAVITY;
+                end else begin
+                    are_timer <= are_timer - 1;
                     state <= STATE_RENDER;
                 end
-            end else begin
-                start_piece_operation <= PIECE_OPERATION_NONE;
             end
-        end
-        STATE_RENDER: begin
-            // TODO: Implement rendering later.
+            STATE_GRAVITY: begin
+                if (frames_from_last_fall >= current_gravity) begin
+                    frames_from_last_fall <= 1;
 
-            // TODO: Move this condition to the `STATE_PADDING`.
-            // This delay is here because we're stopping state changes in a state where the current piece 
-            // is written to the field, so the renderer which works async have the biggest chance of seeing
-            // the field in the appropriate state.
-            if (current_frame_duration == CLK_PER_FRAME - 1) begin
-                current_frame_duration <= 0;
-                
-                if (animating_burn || animating_lose) begin
-                    state <= STATE_PADDING;
+                    if (soft_dropping) begin
+                        soft_dropping_movement <= 1;
+                    end
+
+                    piece_movement <= PIECE_MOVEMENT_DOWN;
+                    start_piece_operation <= PIECE_OPERATION_COLLISION_CHECK;
+                    
+                    state <= STATE_SETTLEMENT_CHECK;
                 end else begin
-                    start_piece_operation <= PIECE_OPERATION_ERASE;
-                    state <= STATE_REMOVE_PIECE_FROM_FIELD;  
+                    frames_from_last_fall <= frames_from_last_fall + 1;
+                        
+                    start_piece_operation <= PIECE_OPERATION_WRITE;
+                    state <= STATE_PUT_PIECE_TO_FIELD;
                 end
             end
-        end
-        STATE_REMOVE_PIECE_FROM_FIELD: begin
-            if(start_piece_operation == PIECE_OPERATION_NONE) begin
-                if (piece_operation_result != 0) begin
-                    state <= STATE_PADDING;
+            STATE_SETTLEMENT_CHECK: begin
+                if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                    case(piece_operation_result) 
+                        PIECE_COLLISION_DETECTED: begin
+                            piece_movement <= PIECE_MOVEMENT_UP;
+                            state <= STATE_SETTLE;
+                        end
+                        PIECE_NO_COLLISIONS_DETECTED: begin
+                            start_piece_operation <= PIECE_OPERATION_WRITE;
+                            state <= STATE_PUT_PIECE_TO_FIELD;
+                        end
+                    endcase
+                end else begin
+                    start_piece_operation <= PIECE_OPERATION_NONE;
+                    soft_dropping_movement <= 0;
+                    piece_movement <= PIECE_MOVEMENT_NONE;
                 end
-            end else begin
-                start_piece_operation <= PIECE_OPERATION_NONE;
             end
-        end
-        STATE_PADDING: begin
-            //if (current_frame_duration == CLK_PER_FRAME - 1) begin
-            //    current_frame_duration <= 0;    
-                state <= STATE_PROCESSING_INPUT;   
-            //end
-        end
-    endcase
+            STATE_SETTLE: begin
+                piece_movement <= PIECE_MOVEMENT_NONE;
+
+                are_timer <= are_by_piece_position(current_piece_center_y);
+
+                if (soft_dropping) begin
+                    commit_soft_drop_score <= 1;
+                end
+                soft_dropping <= 0;
+
+                start_piece_operation <= PIECE_OPERATION_WRITE;
+
+                state <= STATE_WRITE_PIECE_TO_FIELD;
+            end
+            STATE_WRITE_PIECE_TO_FIELD: begin
+                if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                    if (piece_operation_result != 0) begin
+                        start_burn <= 1;
+                        state <= STATE_BURNING;
+                    end
+                end else begin
+                    start_piece_operation <= PIECE_OPERATION_NONE;
+                    commit_soft_drop_score <= 0;
+                end
+            end
+            STATE_BURNING: begin
+                start_burn <= 0;
+
+                if (!start_burn) begin
+                    case(burn_result)
+                        BURN_RESULT_DONE: begin
+                            generate_new_piece <= 1;
+                            frames_from_last_fall <= 0;
+                            start_lose_check <= 1;
+                            animating_burn <= 0;
+
+                            state <= STATE_CHECK_LOSE;
+                        end
+                        BURN_RESULT_ANIMATION_FRAME_DONE: begin
+                            animating_burn <= 1;
+                            state <= STATE_RENDER;
+                        end
+                    endcase
+                end
+            end
+            STATE_CHECK_LOSE: begin
+                generate_new_piece <= 0;
+                start_lose_check <= 0;
+
+                if(!start_lose_check && (lose_result != LOSE_RESULT_NOT_COMPLETE)) begin
+                    if(lose_result == LOSE_RESULT_POSITIVE) begin
+                        game_state <= GAME_STATE_GAME_OVER;
+                    end
+
+                    animating_lose <= lose_result == LOSE_RESULT_ANIMATION_FRAME_DONE;
+
+                    state <= STATE_RENDER;
+                end
+            end
+            STATE_PUT_PIECE_TO_FIELD: begin
+                if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                    if (piece_operation_result != 0) begin
+                        state <= STATE_RENDER;
+                    end
+                end else begin
+                    start_piece_operation <= PIECE_OPERATION_NONE;
+                end
+            end
+            STATE_RENDER: begin
+                // TODO: Implement rendering later.
+
+                // TODO: Move this condition to the `STATE_PADDING`.
+                // This delay is here because we're stopping state changes in a state where the current piece 
+                // is written to the field, so the renderer which works async have the biggest chance of seeing
+                // the field in the appropriate state.
+                if (current_frame_duration == CLK_PER_FRAME - 1) begin
+                    current_frame_duration <= 0;
+                    
+                    if (animating_burn || animating_lose) begin
+                        state <= STATE_PADDING;
+                    end else begin
+                        start_piece_operation <= PIECE_OPERATION_ERASE;
+                        state <= STATE_REMOVE_PIECE_FROM_FIELD;  
+                    end
+                end
+            end
+            STATE_REMOVE_PIECE_FROM_FIELD: begin
+                if(start_piece_operation == PIECE_OPERATION_NONE) begin
+                    if (piece_operation_result != 0) begin
+                        state <= STATE_PADDING;
+                    end
+                end else begin
+                    start_piece_operation <= PIECE_OPERATION_NONE;
+                end
+            end
+            STATE_PADDING: begin
+                //if (current_frame_duration == CLK_PER_FRAME - 1) begin
+                //    current_frame_duration <= 0;    
+                    state <= STATE_PROCESSING_INPUT;   
+                //end
+            end
+        endcase
+    end
 end
 
 function [4:0] are_by_piece_position(input [4:0] current_piece_y);
