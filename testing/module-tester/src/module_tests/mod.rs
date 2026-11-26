@@ -15,6 +15,7 @@ mod burn;
 mod field;
 mod game_loop;
 mod lose;
+mod piece;
 mod scores;
 
 type InputPin = Pin<Input<Floating>>;
@@ -71,6 +72,11 @@ where
                 game_loop::run(serial, clk, reset_n, module_specific);
                 panic!("Done");
             }
+            BoardId::Piece => {
+                ufmt::uwriteln!(&mut serial, "piece module found").unwrap();
+                piece::run(serial, clk, reset_n, module_specific);
+                panic!("Done");
+            }
             BoardId::Invalid(value) => {
                 ufmt::uwriteln!(&mut serial, "invalid module with id={}", value).unwrap();
             }
@@ -85,6 +91,7 @@ enum BoardId {
     Field,
     Scores,
     GameLoop,
+    Piece,
     Invalid(u8),
 }
 
@@ -102,6 +109,7 @@ fn read_board_id(board_id_pins: &[InputPin; 4]) -> BoardId {
         3 => BoardId::Field,
         4 => BoardId::Scores,
         5 => BoardId::GameLoop,
+        6 => BoardId::Piece,
         invalid => BoardId::Invalid(invalid),
     }
 }
