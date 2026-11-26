@@ -13,6 +13,7 @@ use crate::IO_PIN_COUNT;
 
 mod burn;
 mod field;
+mod game_loop;
 mod lose;
 mod scores;
 
@@ -65,6 +66,11 @@ where
                 scores::run(serial, clk, reset_n, module_specific);
                 panic!("Done");
             }
+            BoardId::GameLoop => {
+                ufmt::uwriteln!(&mut serial, "game loop module found").unwrap();
+                game_loop::run(serial, clk, reset_n, module_specific);
+                panic!("Done");
+            }
             BoardId::Invalid(value) => {
                 ufmt::uwriteln!(&mut serial, "invalid module with id={}", value).unwrap();
             }
@@ -78,6 +84,7 @@ enum BoardId {
     Lose,
     Field,
     Scores,
+    GameLoop,
     Invalid(u8),
 }
 
@@ -94,6 +101,7 @@ fn read_board_id(board_id_pins: &[InputPin; 4]) -> BoardId {
         2 => BoardId::Lose,
         3 => BoardId::Field,
         4 => BoardId::Scores,
+        5 => BoardId::GameLoop,
         invalid => BoardId::Invalid(invalid),
     }
 }

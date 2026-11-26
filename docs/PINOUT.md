@@ -3,7 +3,7 @@
 For every module, the following wires must be present:
 
 - clk
-- reset_n (except `field` module)
+- reset_n
 - board id (4 wires)
 
 They are connected as follows:
@@ -26,6 +26,7 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | lose         | 0010          | 2             |
 | field        | 0011          | 3             |
 | scores       | 0100          | 4             |
+| game_loop    | 0101          | 5             |
 
 ## Burn module
 
@@ -96,3 +97,46 @@ Remark: `burn` and `lose` module pinouts are designed such that it's possible to
 | level[5]                       | [41:37] |
 | **debug**                      |         |
 | lines_burned_from_last_time[3] | [47:45] |
+
+## Game loop module
+
+| wire                           | io#     |
+| ------------------------------ | ------- |
+| **input**                      |         |
+| button_rotate_cw               | 0       |
+| button_rotate_ccw              | 1       |
+| button_left                    | 2       |
+| button_right                   | 3       |
+| button_down                    | 4       |
+| button_start                   | 5       |
+| **current level**              |         |
+| current_level[5]               | [10:6]  |
+| **move/rotate current piece**  |         |
+| piece_movement[3]              | [13:11] |
+| piece_rotation[2]              | [15:14] |
+| **current piece data**         |         |
+| current_piece_center_y[5]      | [20:16] |
+| current_piece_type[3]          | [23:21] |
+| **burn control**               |         |
+| start_burn                     | 24      |
+| burn_result[2]                 | [26:25] |
+| **lose control**               |         |
+| start_lose_check               | 27      |
+| lose_result[2]                 | [29:28] |
+| **generate new piece**         |         |
+| generate_new_piece             | 30      |
+| **soft drop reporting**        |         |
+| soft_dropping_movement         | 31      |
+| reset_soft_drop_score          | 32      |
+| commit_soft_drop_score         | 33      |
+| **reset scores**               |         |
+| reset_scores                   | 34      |
+| **game state**                 |         |
+| game_state_out[2]              | [36:35] |
+| **current piece operation**    |         |
+| start_piece_operation[2]       | [38:37] |
+| piece_operation_result[2]      | [40:39] |
+| **debug**                      |         |
+| state[4]                       | [45:42] |
+| animating_burn                 | 46      |
+| animating_lose                 | 47      |
