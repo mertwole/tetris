@@ -1,5 +1,6 @@
 module piece(
     input wire clk,
+    input wire reset_n,
 
     // Spawn a piece.
     // 
@@ -85,7 +86,11 @@ module piece(
     output reg field_write_enable = 0,
     // The value that will be written to the field cell at coordinates (`field_x`, `field_y`) when 
     // `field_write_enable` is asserted.
-    output reg[2:0] field_cell_write_value
+    output reg[2:0] field_cell_write_value,
+
+    output wire[3:0] debug_center_x,
+    output wire[1:0] debug_rotation,
+    output wire[1:0] debug_op_state
 );
 
 localparam MOVE_TYPE_NONE = 'b000;
@@ -104,6 +109,8 @@ localparam RESULT_NO_COLLISION = 'b01;
 localparam RESULT_COLLISION = 'b10;
 
 reg [3:0] x;
+assign debug_center_x = x;
+
 reg [4:0] y;
 
 assign center_y = y;
@@ -112,6 +119,7 @@ assign center_y = y;
 // 
 // Value of 'b00 corresponds to spawn orientation, 'b01 - spawn orientation turned clockwise and so on.
 reg[1:0] rotation;
+assign debug_rotation = rotation;
 
 wire[3:0] cell_x_offset;
 wire[4:0] cell_y_offset;
@@ -127,89 +135,109 @@ localparam OP_STATE_CHECKING = 'b01;
 localparam OP_STATE_WRITING = 'b10;
 
 reg[1:0] op_state = OP_STATE_INIT;
+assign debug_op_state = op_state;
 
 reg field_read_delay = 0;
 
 always @(posedge clk) begin
-    case(op_state)
-        OP_STATE_INIT: begin
-            case(start_operation)
-                'b01: begin
-                    field_read_enable <= 1;
-                    field_read_delay <= 0;
-                    op_state <= OP_STATE_CHECKING;
-                end
-                'b10: begin
-                    field_cell_write_value <= type;
-                    field_write_enable <= 1;
-                    op_state <= OP_STATE_WRITING;
-                end
-                'b11: begin
-                    field_cell_write_value <= 'b000;
-                    field_write_enable <= 1;
-                    op_state <= OP_STATE_WRITING;
-                end
-            endcase
+    if (!reset_n) begin
+        operation_result <= 0;
 
-            if(start_operation != 0) begin
-                operation_result <= 0;
-                read_index <= 0;
+        field_read_enable <= 0;
+        field_write_enable <= 0;
+        field_cell_write_value <= 0;
+        
+        x <= 0;
+        y <= 0; 
+        type <= 0;
+        rotation <= 0;
+
+        read_index <= 0;
+        op_state <= OP_STATE_INIT;
+        field_read_delay <= 0;
+    end else begin
+        case(op_state)
+            OP_STATE_INIT: begin
+                case(start_operation)
+                    'b01: begin
+                        field_read_enable <= 1;
+                        field_read_delay <= 0;
+                        op_state <= OP_STATE_CHECKING;
+                    end
+                    'b10: begin
+                        field_cell_write_value <= type;
+                        field_write_enable <= 1;
+                        op_state <= OP_STATE_WRITING;
+                    end
+                    'b11: begin
+                        field_cell_write_value <= 'b000;
+                        field_write_enable <= 1;
+                        op_state <= OP_STATE_WRITING;
+                    end
+                endcase
+
+                if(start_operation != 0) begin
+                    operation_result <= 0;
+                    read_index <= 0;
+                end
             end
-        end
-        OP_STATE_CHECKING: begin
-            field_read_delay <= ~field_read_delay;
-            if (field_read_delay != 0) begin
+            OP_STATE_CHECKING: begin
+                field_read_delay <= ~field_read_delay;
+                if (field_read_delay != 0) begin
+                    read_index <= read_index + 1;
+
+                    if (field_cell_read_value != 'b000 || field_x < 3 || field_x > 12 || field_y < 3) begin
+                        operation_result <= RESULT_COLLISION;
+                        field_read_enable <= 0;
+                        op_state <= OP_STATE_INIT;
+                    end else if(read_index == 3) begin
+                        operation_result <= RESULT_NO_COLLISION;
+                        field_read_enable <= 0;
+                        op_state <= OP_STATE_INIT;
+                    end
+                end
+            end 
+            OP_STATE_WRITING: begin
                 read_index <= read_index + 1;
-
-                if (field_cell_read_value != 'b000 || field_x < 3 || field_x > 12 || field_y < 3) begin
-                    operation_result <= RESULT_COLLISION;
-                    field_read_enable <= 0;
-                    op_state <= OP_STATE_INIT;
-                end else if(read_index == 3) begin
-                    operation_result <= RESULT_NO_COLLISION;
-                    field_read_enable <= 0;
+                
+                if(read_index == 3) begin
+                    operation_result <= RESULT_DONE;
+                    field_write_enable <= 0;
                     op_state <= OP_STATE_INIT;
                 end
             end
-        end 
-        OP_STATE_WRITING: begin
-            read_index <= read_index + 1;
-            
-            if(read_index == 3) begin
-                operation_result <= RESULT_DONE;
-                field_write_enable <= 0;
-                op_state <= OP_STATE_INIT;
-            end
-        end
-    endcase
+        endcase
+    end
 end
 
 always @(posedge clk) begin
-    if (spawned_type != 'b000) begin
-        rotation <= 0;
-        x <= 8;
-        y <= 22;
-        type <= spawned_type;
-    end else begin
-        case(rotation_in)
-            ROTATE_CW: rotation <= rotation + 1;
-            ROTATE_CCW: rotation <= rotation - 1;
-        endcase
+    if (reset_n) begin
+        if (spawned_type != 'b000) begin
+            rotation <= 0;
+            x <= 8;
+            y <= 22;
+            type <= spawned_type;
+        end else begin
+            case(rotation_in)
+                ROTATE_CW: rotation <= rotation + 1;
+                ROTATE_CCW: rotation <= rotation - 1;
+            endcase
 
-        case (movement_in)
-            MOVE_TYPE_DOWN: begin
-                y <= y - 1;
-            end
-            MOVE_TYPE_LEFT: begin
-                x <= x - 1;
-            end
-            MOVE_TYPE_RIGHT: begin
-                x <= x + 1;
-            end
-            MOVE_TYPE_UP: begin
-                y <= y + 1;
-            end
-        endcase
+            case (movement_in)
+                MOVE_TYPE_DOWN: begin
+                    y <= y - 1;
+                end
+                MOVE_TYPE_LEFT: begin
+                    x <= x - 1;
+                end
+                MOVE_TYPE_RIGHT: begin
+                    x <= x + 1;
+                end
+                MOVE_TYPE_UP: begin
+                    y <= y + 1;
+                end
+            endcase
+        end
     end
 end
 
